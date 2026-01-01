@@ -1,6 +1,6 @@
 import { theme } from "./theme";
 
-export const categories = [
+export const quickCategories = [
   {
     id: "travel",
     name: "Travel",
@@ -26,3 +26,28 @@ export const categories = [
     color: theme.colors.dark,
   },
 ];
+
+// Get color for any category
+export const getCategoryColor = (category: string) => {
+  const quickCategory = quickCategories.find((c) => c.id === category);
+  if (quickCategory) return quickCategory.color;
+
+  // Generate a consistent color for custom categories
+  const colors = [
+    theme.colors.primary,
+    theme.colors.accent,
+    theme.colors.secondary,
+    theme.colors.dark,
+  ];
+  const index =
+    Math.abs(
+      category.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)
+    ) % colors.length;
+  return colors[index];
+};
+
+// Get icon for category
+export const getCategoryIcon = (category: string) => {
+  const quickCategory = quickCategories.find((c) => c.id === category);
+  return quickCategory?.icon || "📌";
+};

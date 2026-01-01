@@ -1,43 +1,24 @@
-import React, { useState, useRef } from "react";
+import React, { useRef } from "react";
 import {
-  View,
+  Alert,
+  Animated,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  TextInput,
-  StyleSheet,
-  Animated,
+  View,
 } from "react-native";
+import { BucketItem } from "../../lib/supabase";
+import { getCategoryColor, getCategoryIcon } from "../config/categories";
 import { theme } from "../config/theme";
-import { categories } from "../config/categories";
-
-interface Goal {
-  id: string;
-  title: string;
-  category: string;
-  completed: boolean;
-  addedBy: string;
-  reactions: string[];
-  comments: string[];
-}
 
 interface GoalItemProps {
-  goal: Goal;
+  goal: BucketItem;
   onToggle: (id: string) => void;
-  onReact: (id: string, emoji: string) => void;
-  onComment: (id: string, comment: string) => void;
+  onDelete: (id: string) => void;
 }
 
-export default function GoalItem({
-  goal,
-  onToggle,
-  onReact,
-  onComment,
-}: GoalItemProps) {
-  const [showActions, setShowActions] = useState(false);
-  const [commentText, setCommentText] = useState("");
+export default function GoalItem({ goal, onToggle, onDelete }: GoalItemProps) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
-
-  const category = categories.find((c) => c.id === goal.category);
 
   const handlePress = () => {
     Animated.sequence([
@@ -55,12 +36,32 @@ export default function GoalItem({
     onToggle(goal.id);
   };
 
-  const addComment = () => {
-    if (commentText.trim()) {
-      onComment(goal.id, commentText);
-      setCommentText("");
-    }
+  const handleDelete = () => {
+    Alert.alert("Delete Dream", "Are you sure you want to delete this dream?", [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => onDelete(goal.id),
+      },
+    ]);
   };
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  const categoryColor = getCategoryColor(goal.category);
+  const categoryIcon = getCategoryIcon(goal.category);
 
   return (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
@@ -78,7 +79,7 @@ export default function GoalItem({
 
           <View style={styles.content}>
             <View style={styles.titleRow}>
-              <Text style={styles.icon}>{category?.icon}</Text>
+              <Text style={styles.icon}>{categoryIcon}</Text>
               <Text
                 style={[styles.title, goal.completed && styles.titleCompleted]}
               >
@@ -91,65 +92,41 @@ export default function GoalItem({
                   styles.badge,
                   {
                     backgroundColor:
-                      goal.addedBy === "A"
+                      goal.added_by === "A"
                         ? theme.colors.accent
                         : theme.colors.secondary,
                   },
                 ]}
               >
-                <Text style={styles.badgeText}>{goal.addedBy}</Text>
+                <Text style={styles.badgeText}>{goal.added_by}</Text>
               </View>
-              <Text style={styles.category}>{category?.name}</Text>
+              <View
+                style={[
+                  styles.categoryBadge,
+                  { backgroundColor: categoryColor + "40" },
+                ]}
+              >
+                <Text style={[styles.categoryText, { color: categoryColor }]}>
+                  {goal.category}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.dateRow}>
+              <Text style={styles.dateText}>
+                Created: {formatDate(goal.created_at)}
+              </Text>
+              {goal.completed_at && (
+                <Text style={styles.dateText}>
+                  • Completed: {formatDate(goal.completed_at)}
+                </Text>
+              )}
             </View>
           </View>
 
-          <TouchableOpacity onPress={() => setShowActions(!showActions)}>
-            <Text style={styles.actionIcon}>💬</Text>
+          <TouchableOpacity onPress={handleDelete} style={styles.deleteButton}>
+            <Text style={styles.deleteIcon}>🗑️</Text>
           </TouchableOpacity>
         </View>
-
-        {showActions && (
-          <View style={styles.actions}>
-            <View style={styles.reactions}>
-              {["❤️", "😂", "😍", "👍"].map((emoji) => (
-                <TouchableOpacity
-                  key={emoji}
-                  onPress={() => onReact(goal.id, emoji)}
-                  style={[
-                    styles.reactionButton,
-                    goal.reactions.includes(emoji) &&
-                      styles.reactionButtonActive,
-                  ]}
-                >
-                  <Text style={styles.reactionEmoji}>{emoji}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {goal.comments.length > 0 && (
-              <View style={styles.comments}>
-                {goal.comments.map((comment, idx) => (
-                  <Text key={idx} style={styles.comment}>
-                    💭 {comment}
-                  </Text>
-                ))}
-              </View>
-            )}
-
-            <View style={styles.commentInput}>
-              <TextInput
-                value={commentText}
-                onChangeText={setCommentText}
-                placeholder="Add a note..."
-                placeholderTextColor={theme.colors.textSecondary}
-                style={styles.input}
-              />
-              <TouchableOpacity onPress={addComment} style={styles.addButton}>
-                <Text style={styles.addButtonText}>Add</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
       </View>
     </Animated.View>
   );
@@ -215,7 +192,8 @@ const styles = StyleSheet.create({
   metaRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 4,
+    marginTop: 6,
+    gap: 8,
   },
   badge: {
     width: 20,
@@ -229,67 +207,29 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "white",
   },
-  category: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
-    marginLeft: 6,
+  categoryBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
   },
-  actionIcon: {
-    fontSize: 20,
-  },
-  actions: {
-    marginTop: theme.spacing.md,
-    paddingTop: theme.spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-  },
-  reactions: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: theme.spacing.sm,
-  },
-  reactionButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: theme.colors.background,
-  },
-  reactionButtonActive: {
-    backgroundColor: theme.colors.surface,
-  },
-  reactionEmoji: {
-    fontSize: 18,
-  },
-  comments: {
-    marginBottom: theme.spacing.sm,
-  },
-  comment: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
-    marginBottom: 4,
-  },
-  commentInput: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  input: {
-    flex: 1,
-    borderRadius: 12,
-    backgroundColor: theme.colors.background,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 14,
-    color: theme.colors.textPrimary,
-  },
-  addButton: {
-    backgroundColor: theme.colors.primary,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    justifyContent: "center",
-  },
-  addButtonText: {
-    color: "white",
+  categoryText: {
+    fontSize: 11,
     fontWeight: "600",
+  },
+  dateRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 4,
+    gap: 4,
+  },
+  dateText: {
+    fontSize: 10,
+    color: theme.colors.textSecondary,
+  },
+  deleteButton: {
+    padding: 8,
+  },
+  deleteIcon: {
+    fontSize: 18,
   },
 });

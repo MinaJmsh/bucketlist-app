@@ -1,19 +1,21 @@
 import React, { useState } from "react";
 import {
-  View,
-  Text,
   Modal,
-  TouchableOpacity,
-  TextInput,
+  ScrollView,
   StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
+import { NewBucketItem } from "../../lib/supabase";
+import { quickCategories } from "../config/categories";
 import { theme } from "../config/theme";
-import { categories } from "../config/categories";
 
 interface AddGoalModalProps {
   visible: boolean;
   onClose: () => void;
-  onAdd: (goal: { title: string; category: string }) => void;
+  onAdd: (goal: NewBucketItem) => void;
 }
 
 export default function AddGoalModal({
@@ -23,12 +25,25 @@ export default function AddGoalModal({
 }: AddGoalModalProps) {
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("travel");
+  const [customCategory, setCustomCategory] = useState("");
+  const [isCustom, setIsCustom] = useState(false);
+  const [addedBy, setAddedBy] = useState("A");
 
   const handleAdd = () => {
     if (title.trim()) {
-      onAdd({ title, category });
+      onAdd({
+        title: title.trim(),
+        category:
+          isCustom && customCategory.trim() ? customCategory.trim() : category,
+        added_by: addedBy,
+        period: "week",
+      });
+      // Reset form
       setTitle("");
       setCategory("travel");
+      setCustomCategory("");
+      setIsCustom(false);
+      setAddedBy("A");
       onClose();
     }
   };
@@ -50,34 +65,112 @@ export default function AddGoalModal({
             placeholder="What do you dream of?"
             placeholderTextColor={theme.colors.textSecondary}
             style={styles.input}
+            autoFocus
           />
+
+          <Text style={styles.label}>Added By</Text>
+          <View style={styles.addedByContainer}>
+            <TouchableOpacity
+              onPress={() => setAddedBy("A")}
+              style={[
+                styles.addedByButton,
+                addedBy === "A" && styles.addedByButtonActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.addedByText,
+                  addedBy === "A" && styles.addedByTextActive,
+                ]}
+              >
+                Partner A
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setAddedBy("B")}
+              style={[
+                styles.addedByButton,
+                addedBy === "B" && styles.addedByButtonActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.addedByText,
+                  addedBy === "B" && styles.addedByTextActive,
+                ]}
+              >
+                Partner B
+              </Text>
+            </TouchableOpacity>
+          </View>
 
           <Text style={styles.label}>Category</Text>
 
-          <View style={styles.categories}>
-            {categories.map((cat) => (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.categoriesScroll}
+          >
+            <View style={styles.categories}>
+              {quickCategories.map((cat) => (
+                <TouchableOpacity
+                  key={cat.id}
+                  onPress={() => {
+                    setCategory(cat.id);
+                    setIsCustom(false);
+                  }}
+                  style={[
+                    styles.categoryButton,
+                    !isCustom &&
+                      category === cat.id && {
+                        backgroundColor: cat.color,
+                      },
+                  ]}
+                >
+                  <Text style={styles.categoryIcon}>{cat.icon}</Text>
+                  <Text
+                    style={[
+                      styles.categoryText,
+                      !isCustom &&
+                        category === cat.id &&
+                        styles.categoryTextActive,
+                    ]}
+                  >
+                    {cat.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
               <TouchableOpacity
-                key={cat.id}
-                onPress={() => setCategory(cat.id)}
+                onPress={() => setIsCustom(true)}
                 style={[
                   styles.categoryButton,
-                  category === cat.id && {
-                    backgroundColor: cat.color,
+                  isCustom && {
+                    backgroundColor: theme.colors.dark,
                   },
                 ]}
               >
-                <Text style={styles.categoryIcon}>{cat.icon}</Text>
+                <Text style={styles.categoryIcon}>✏️</Text>
                 <Text
                   style={[
                     styles.categoryText,
-                    category === cat.id && styles.categoryTextActive,
+                    isCustom && styles.categoryTextActive,
                   ]}
                 >
-                  {cat.name}
+                  Custom
                 </Text>
               </TouchableOpacity>
-            ))}
-          </View>
+            </View>
+          </ScrollView>
+
+          {isCustom && (
+            <TextInput
+              value={customCategory}
+              onChangeText={setCustomCategory}
+              placeholder="Enter custom category"
+              placeholderTextColor={theme.colors.textSecondary}
+              style={[styles.input, styles.customInput]}
+            />
+          )}
 
           <View style={styles.buttons}>
             <TouchableOpacity
@@ -89,6 +182,7 @@ export default function AddGoalModal({
             <TouchableOpacity
               onPress={handleAdd}
               style={[styles.button, styles.addButton]}
+              disabled={!title.trim()}
             >
               <Text style={styles.addButtonText}>Add Dream</Text>
             </TouchableOpacity>
@@ -111,6 +205,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     padding: theme.spacing.xl,
     paddingBottom: 40,
+    maxHeight: "90%",
   },
   title: {
     fontSize: 24,
@@ -127,17 +222,44 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing.md,
   },
+  customInput: {
+    marginTop: theme.spacing.sm,
+  },
   label: {
     fontSize: 14,
     fontWeight: "600",
     color: theme.colors.textSecondary,
     marginBottom: theme.spacing.sm,
   },
+  addedByContainer: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: theme.spacing.md,
+  },
+  addedByButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: theme.colors.background,
+    alignItems: "center",
+  },
+  addedByButtonActive: {
+    backgroundColor: theme.colors.primary,
+  },
+  addedByText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: theme.colors.textPrimary,
+  },
+  addedByTextActive: {
+    color: "white",
+  },
+  categoriesScroll: {
+    marginBottom: theme.spacing.lg,
+  },
   categories: {
     flexDirection: "row",
-    flexWrap: "wrap",
     gap: 8,
-    marginBottom: theme.spacing.lg,
   },
   categoryButton: {
     paddingHorizontal: 16,

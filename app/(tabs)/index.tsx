@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -7,62 +9,43 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { BucketItem, NewBucketItem, supabase } from "../../lib/supabase";
 import AddGoalModal from "../components/AddGoalModal";
 import GoalItem from "../components/GoalItem";
 import ProgressRing from "../components/ProgressRing";
 import { theme } from "../config/theme";
 
-// Sample initial data
-const initialGoals = [
-  {
-    id: "1",
-    title: "Visit Japan together",
-    category: "travel",
-    completed: false,
-    addedBy: "A",
-    reactions: ["❤️", "😍"],
-    comments: [],
-    period: "weekly",
-  },
-  {
-    id: "2",
-    title: "Try making pasta from scratch",
-    category: "food",
-    completed: false,
-    addedBy: "B",
-    reactions: ["👍"],
-    comments: [],
-    period: "weekly",
-  },
-  {
-    id: "3",
-    title: "Run a 5K together",
-    category: "challenges",
-    completed: true,
-    addedBy: "A",
-    reactions: ["💪"],
-    comments: ["We did it! 🎉"],
-    period: "monthly",
-  },
-  {
-    id: "4",
-    title: "Watch all Studio Ghibli movies",
-    category: "cozy",
-    completed: false,
-    addedBy: "B",
-    reactions: [],
-    comments: [],
-    period: "daily",
-  },
-];
-
-type Period = "daily" | "weekly" | "monthly";
+type Period = "week" | "month" | "year";
 
 export default function Index() {
-  const [goals, setGoals] = useState(initialGoals);
+  const [goals, setGoals] = useState<BucketItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("active");
   const [showAddModal, setShowAddModal] = useState(false);
-  const [activePeriod, setActivePeriod] = useState<Period>("weekly");
+  const [activePeriod, setActivePeriod] = useState<Period>("week");
+
+  // Load goals from Supabase
+  useEffect(() => {
+    loadGoals();
+  }, []);
+
+  const loadGoals = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("bucket_items")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setGoals(data || []);
+    } catch (error) {
+      console.error("Error loading goals:", error);
+      Alert.alert("Error", "Failed to load bucket list items");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Filter goals by active period
   const periodGoals = goals.filter((g) => g.period === activePeriod);
@@ -73,53 +56,80 @@ export default function Index() {
       ? (completedGoals.length / periodGoals.length) * 100
       : 0;
 
-  const toggleGoal = (id: string) => {
-    setGoals(
-      goals.map((g) => (g.id === id ? { ...g, completed: !g.completed } : g))
-    );
+  const toggleGoal = async (id: string) => {
+    const goal = goals.find((g) => g.id === id);
+    if (!goal) return;
+
+    const newCompleted = !goal.completed;
+    const updates = {
+      completed: newCompleted,
+      completed_at: newCompleted ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    };
+
+    try {
+      const { error } = await supabase
+        .from("bucket_items")
+        .update(updates)
+        .eq("id", id);
+
+      if (error) throw error;
+
+      setGoals(goals.map((g) => (g.id === id ? { ...g, ...updates } : g)));
+    } catch (error) {
+      console.error("Error toggling goal:", error);
+      Alert.alert("Error", "Failed to update item");
+    }
   };
 
-  const addReaction = (id: string, emoji: string) => {
-    setGoals(
-      goals.map((g) => {
-        if (g.id === id) {
-          const hasReaction = g.reactions.includes(emoji);
-          return {
-            ...g,
-            reactions: hasReaction
-              ? g.reactions.filter((r) => r !== emoji)
-              : [...g.reactions, emoji],
-          };
-        }
-        return g;
-      })
-    );
+  const deleteGoal = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("bucket_items")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+
+      setGoals(goals.filter((g) => g.id !== id));
+    } catch (error) {
+      console.error("Error deleting goal:", error);
+      Alert.alert("Error", "Failed to delete item");
+    }
   };
 
-  const addComment = (id: string, comment: string) => {
-    setGoals(
-      goals.map((g) =>
-        g.id === id ? { ...g, comments: [...g.comments, comment] } : g
-      )
-    );
-  };
+  const addNewGoal = async (newGoal: NewBucketItem) => {
+    try {
+      const { data, error } = await supabase
+        .from("bucket_items")
+        .insert([
+          {
+            ...newGoal,
+            period: activePeriod,
+          },
+        ])
+        .select()
+        .single();
 
-  const addNewGoal = (newGoal: any) => {
-    setGoals([
-      ...goals,
-      {
-        id: Date.now().toString(),
-        ...newGoal,
-        completed: false,
-        addedBy: "A",
-        reactions: [],
-        comments: [],
-        period: activePeriod,
-      },
-    ]);
+      if (error) throw error;
+
+      setGoals([data, ...goals]);
+    } catch (error) {
+      console.error("Error adding goal:", error);
+      Alert.alert("Error", "Failed to add item");
+    }
   };
 
   const displayGoals = activeTab === "active" ? activeGoals : completedGoals;
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={styles.loadingText}>Loading your bucket list...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -130,7 +140,7 @@ export default function Index() {
 
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>OUR DREAMS</Text>
+        <Text style={styles.headerTitle}>MAP BUCKETLIST</Text>
       </View>
 
       <ScrollView style={styles.scrollView}>
@@ -183,49 +193,49 @@ export default function Index() {
             <TouchableOpacity
               style={[
                 styles.periodButton,
-                activePeriod === "daily" && styles.periodActive,
+                activePeriod === "week" && styles.periodActive,
               ]}
-              onPress={() => setActivePeriod("daily")}
+              onPress={() => setActivePeriod("week")}
             >
               <Text
                 style={[
                   styles.periodText,
-                  activePeriod === "daily" && styles.periodTextActive,
+                  activePeriod === "week" && styles.periodTextActive,
                 ]}
               >
-                DAILY
+                THIS WEEK
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[
                 styles.periodButton,
-                activePeriod === "weekly" && styles.periodActive,
+                activePeriod === "month" && styles.periodActive,
               ]}
-              onPress={() => setActivePeriod("weekly")}
+              onPress={() => setActivePeriod("month")}
             >
               <Text
                 style={[
                   styles.periodText,
-                  activePeriod === "weekly" && styles.periodTextActive,
+                  activePeriod === "month" && styles.periodTextActive,
                 ]}
               >
-                WEEKLY
+                THIS MONTH
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[
                 styles.periodButton,
-                activePeriod === "monthly" && styles.periodActive,
+                activePeriod === "year" && styles.periodActive,
               ]}
-              onPress={() => setActivePeriod("monthly")}
+              onPress={() => setActivePeriod("year")}
             >
               <Text
                 style={[
                   styles.periodText,
-                  activePeriod === "monthly" && styles.periodTextActive,
+                  activePeriod === "year" && styles.periodTextActive,
                 ]}
               >
-                MONTHLY
+                THIS YEAR
               </Text>
             </TouchableOpacity>
           </View>
@@ -260,15 +270,25 @@ export default function Index() {
             </TouchableOpacity>
           </View>
 
-          {displayGoals.map((goal) => (
-            <GoalItem
-              key={goal.id}
-              goal={goal}
-              onToggle={toggleGoal}
-              onReact={addReaction}
-              onComment={addComment}
-            />
-          ))}
+          {displayGoals.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyIcon}>🎯</Text>
+              <Text style={styles.emptyText}>
+                {activeTab === "active"
+                  ? "No active dreams yet. Tap + to add one!"
+                  : "No completed dreams yet. Start checking them off!"}
+              </Text>
+            </View>
+          ) : (
+            displayGoals.map((goal) => (
+              <GoalItem
+                key={goal.id}
+                goal={goal}
+                onToggle={toggleGoal}
+                onDelete={deleteGoal}
+              />
+            ))
+          )}
 
           <View style={{ height: 100 }} />
         </View>
@@ -295,6 +315,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+  },
+  centerContent: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: theme.colors.textSecondary,
   },
   header: {
     flexDirection: "row",
@@ -456,6 +485,20 @@ const styles = StyleSheet.create({
   },
   tabTextActive: {
     color: "white",
+  },
+  emptyState: {
+    alignItems: "center",
+    paddingVertical: 48,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: theme.colors.textSecondary,
+    textAlign: "center",
+    paddingHorizontal: 32,
   },
   floatingButton: {
     position: "absolute",

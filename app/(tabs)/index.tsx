@@ -1,3 +1,4 @@
+import { ThemedText } from "@/components/themed-text";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -9,11 +10,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { theme } from "../../config/theme";
 import { BucketItem, NewBucketItem, supabase } from "../../lib/supabase";
 import AddGoalModal from "../components/AddGoalModal";
 import GoalItem from "../components/GoalItem";
 import ProgressRing from "../components/ProgressRing";
-import { theme } from "../config/theme";
 
 type Period = "week" | "month" | "year";
 
@@ -126,7 +127,9 @@ export default function Index() {
     return (
       <View style={[styles.container, styles.centerContent]}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={styles.loadingText}>Loading your bucket list...</Text>
+        <ThemedText style={styles.loadingText}>
+          Loading your bucket list...
+        </ThemedText>
       </View>
     );
   }
@@ -140,7 +143,13 @@ export default function Index() {
 
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>MAP BUCKETLIST</Text>
+        <ThemedText
+          style={styles.headerTitle}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+        >
+          MAP BUCKETLIST
+        </ThemedText>
       </View>
 
       <ScrollView style={styles.scrollView}>
@@ -149,17 +158,21 @@ export default function Index() {
           <View style={styles.statsCard}>
             <View style={styles.mainStats}>
               <View style={styles.leftStat}>
-                <Text style={styles.statIcon}>❤️</Text>
-                <Text style={styles.statNumber}>{completedGoals.length}</Text>
-                <Text style={styles.statLabel}>DREAMS{"\n"}COMPLETE</Text>
+                <ThemedText style={styles.statIcon}>❤️</ThemedText>
+                <ThemedText style={styles.statNumber}>
+                  {completedGoals.length}
+                </ThemedText>
+                <ThemedText style={styles.statLabel}>
+                  DREAMS{"\n"}COMPLETE
+                </ThemedText>
               </View>
 
               <View style={styles.rightStat}>
                 <ProgressRing progress={progress} />
                 <TouchableOpacity style={styles.normalButton}>
-                  <Text style={styles.normalText}>
+                  <ThemedText style={styles.normalText}>
                     {activeGoals.length} TO GO
-                  </Text>
+                  </ThemedText>
                 </TouchableOpacity>
               </View>
             </View>
@@ -172,18 +185,22 @@ export default function Index() {
             {/* Mini Stats */}
             <View style={styles.miniStats}>
               <View style={styles.miniStatCard}>
-                <Text style={styles.miniStatValue}>
+                <ThemedText style={styles.miniStatValue}>
                   {completedGoals.length}
-                </Text>
-                <Text style={styles.miniStatLabel}>Done</Text>
+                </ThemedText>
+                <ThemedText style={styles.miniStatLabel}>Done</ThemedText>
               </View>
               <View style={styles.miniStatCard}>
-                <Text style={styles.miniStatValue}>{activeGoals.length}</Text>
-                <Text style={styles.miniStatLabel}>Active</Text>
+                <ThemedText style={styles.miniStatValue}>
+                  {activeGoals.length}
+                </ThemedText>
+                <ThemedText style={styles.miniStatLabel}>Active</ThemedText>
               </View>
               <View style={styles.miniStatCard}>
-                <Text style={styles.miniStatValue}>{periodGoals.length}</Text>
-                <Text style={styles.miniStatLabel}>Total</Text>
+                <ThemedText style={styles.miniStatValue}>
+                  {periodGoals.length}
+                </ThemedText>
+                <ThemedText style={styles.miniStatLabel}>Total</ThemedText>
               </View>
             </View>
           </View>
@@ -197,14 +214,14 @@ export default function Index() {
               ]}
               onPress={() => setActivePeriod("week")}
             >
-              <Text
+              <ThemedText
                 style={[
                   styles.periodText,
                   activePeriod === "week" && styles.periodTextActive,
                 ]}
               >
                 THIS WEEK
-              </Text>
+              </ThemedText>
             </TouchableOpacity>
             <TouchableOpacity
               style={[
@@ -213,14 +230,14 @@ export default function Index() {
               ]}
               onPress={() => setActivePeriod("month")}
             >
-              <Text
+              <ThemedText
                 style={[
                   styles.periodText,
                   activePeriod === "month" && styles.periodTextActive,
                 ]}
               >
                 THIS MONTH
-              </Text>
+              </ThemedText>
             </TouchableOpacity>
             <TouchableOpacity
               style={[
@@ -229,14 +246,14 @@ export default function Index() {
               ]}
               onPress={() => setActivePeriod("year")}
             >
-              <Text
+              <ThemedText
                 style={[
                   styles.periodText,
                   activePeriod === "year" && styles.periodTextActive,
                 ]}
               >
                 THIS YEAR
-              </Text>
+              </ThemedText>
             </TouchableOpacity>
           </View>
 
@@ -246,38 +263,38 @@ export default function Index() {
               onPress={() => setActiveTab("active")}
               style={[styles.tab, activeTab === "active" && styles.tabActive]}
             >
-              <Text
+              <ThemedText
                 style={[
                   styles.tabText,
                   activeTab === "active" && styles.tabTextActive,
                 ]}
               >
                 Active
-              </Text>
+              </ThemedText>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setActiveTab("memories")}
               style={[styles.tab, activeTab === "memories" && styles.tabActive]}
             >
-              <Text
+              <ThemedText
                 style={[
                   styles.tabText,
                   activeTab === "memories" && styles.tabTextActive,
                 ]}
               >
                 Memories
-              </Text>
+              </ThemedText>
             </TouchableOpacity>
           </View>
 
           {displayGoals.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>🎯</Text>
-              <Text style={styles.emptyText}>
+              <ThemedText style={styles.emptyText}>
                 {activeTab === "active"
                   ? "No active dreams yet. Tap + to add one!"
                   : "No completed dreams yet. Start checking them off!"}
-              </Text>
+              </ThemedText>
             </View>
           ) : (
             displayGoals.map((goal) => (
@@ -326,19 +343,21 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
   },
   header: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
+    width: "100%", // full width of the screen
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row", // keeps everything in one row
   },
+
   headerTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: theme.colors.textPrimary,
-    letterSpacing: 1.5,
+    fontSize: 20,
+    textAlign: "center",
+    flexShrink: 1,
   },
+
   scrollView: {
     flex: 1,
   },
@@ -367,16 +386,16 @@ const styles = StyleSheet.create({
   },
   statNumber: {
     fontSize: 42,
-    fontWeight: "700",
+    // fontWeight: "700",
     color: theme.colors.textPrimary,
     marginBottom: 4,
   },
   statLabel: {
-    fontSize: 11,
-    fontWeight: "600",
+    fontSize: 20,
+    // fontWeight: "600",
     color: theme.colors.textSecondary,
     letterSpacing: 0.5,
-    lineHeight: 14,
+    lineHeight: 24,
   },
   rightStat: {
     alignItems: "center",
@@ -392,8 +411,8 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
   },
   normalText: {
-    fontSize: 11,
-    fontWeight: "700",
+    fontSize: 16,
+    // fontWeight: "700",
     color: theme.colors.textPrimary,
     letterSpacing: 0.5,
   },
@@ -423,14 +442,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   miniStatValue: {
-    fontSize: 18,
-    fontWeight: "700",
+    fontSize: 28,
+    // fontWeight: "700",
     color: theme.colors.textPrimary,
     marginBottom: 4,
   },
   miniStatLabel: {
-    fontSize: 11,
-    fontWeight: "600",
+    fontSize: 18,
+    // fontWeight: "600",
     color: theme.colors.textSecondary,
   },
   periodButtons: {
@@ -452,8 +471,8 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
   },
   periodText: {
-    fontSize: 11,
-    fontWeight: "700",
+    fontSize: 12,
+    // fontWeight: "700",
     color: theme.colors.textSecondary,
     letterSpacing: 0.5,
   },
@@ -480,8 +499,8 @@ const styles = StyleSheet.create({
   },
   tabText: {
     color: theme.colors.textPrimary,
-    fontWeight: "700",
-    fontSize: 14,
+    // fontWeight: "700",
+    fontSize: 18,
   },
   tabTextActive: {
     color: "white",

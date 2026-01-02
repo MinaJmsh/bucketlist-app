@@ -1,3 +1,4 @@
+import { ThemedText } from "@/components/themed-text";
 import React, { useRef } from "react";
 import {
   Alert,
@@ -7,9 +8,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { getCategoryColor, getCategoryIcon } from "../../config/categories";
+import { theme } from "../../config/theme";
 import { BucketItem } from "../../lib/supabase";
-import { getCategoryColor, getCategoryIcon } from "../config/categories";
-import { theme } from "../config/theme";
 
 interface GoalItemProps {
   goal: BucketItem;
@@ -80,11 +81,11 @@ export default function GoalItem({ goal, onToggle, onDelete }: GoalItemProps) {
           <View style={styles.content}>
             <View style={styles.titleRow}>
               <Text style={styles.icon}>{categoryIcon}</Text>
-              <Text
+              <ThemedText
                 style={[styles.title, goal.completed && styles.titleCompleted]}
               >
                 {goal.title}
-              </Text>
+              </ThemedText>
             </View>
             <View style={styles.metaRow}>
               <View
@@ -98,7 +99,13 @@ export default function GoalItem({ goal, onToggle, onDelete }: GoalItemProps) {
                   },
                 ]}
               >
-                <Text style={styles.badgeText}>{goal.added_by}</Text>
+                <Text style={styles.badgeText}>
+                  {goal.added_by === "A"
+                    ? "M"
+                    : goal.added_by === "B"
+                    ? "P"
+                    : goal.added_by}
+                </Text>
               </View>
               <View
                 style={[
@@ -106,19 +113,21 @@ export default function GoalItem({ goal, onToggle, onDelete }: GoalItemProps) {
                   { backgroundColor: categoryColor + "40" },
                 ]}
               >
-                <Text style={[styles.categoryText, { color: categoryColor }]}>
+                <ThemedText
+                  style={[styles.categoryText, { color: categoryColor }]}
+                >
                   {goal.category}
-                </Text>
+                </ThemedText>
               </View>
             </View>
             <View style={styles.dateRow}>
-              <Text style={styles.dateText}>
+              <ThemedText style={styles.dateText}>
                 Created: {formatDate(goal.created_at)}
-              </Text>
+              </ThemedText>
               {goal.completed_at && (
-                <Text style={styles.dateText}>
+                <ThemedText style={styles.dateText}>
                   • Completed: {formatDate(goal.completed_at)}
-                </Text>
+                </ThemedText>
               )}
             </View>
           </View>
@@ -137,6 +146,9 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderRadius: 20,
     padding: theme.spacing.md,
+    // paddingVertical: theme.spacing.sm,
+    paddingVertical: 4,
+
     marginBottom: theme.spacing.md,
     shadowColor: "rgba(0,0,0,0.1)",
     shadowOffset: { width: 0, height: 4 },
@@ -209,11 +221,12 @@ const styles = StyleSheet.create({
   },
   categoryBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 0,
     borderRadius: 8,
   },
   categoryText: {
-    fontSize: 11,
+    fontSize: 12,
+    lineHeight: 20,
     fontWeight: "600",
   },
   dateRow: {
@@ -224,6 +237,7 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: 10,
+    lineHeight: 14,
     color: theme.colors.textSecondary,
   },
   deleteButton: {

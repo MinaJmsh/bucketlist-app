@@ -1,3 +1,4 @@
+import { ThemedText } from "@/components/themed-text";
 import React, { useState } from "react";
 import {
   Modal,
@@ -8,9 +9,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { quickCategories } from "../../config/categories";
+import { theme } from "../../config/theme";
 import { NewBucketItem } from "../../lib/supabase";
-import { quickCategories } from "../config/categories";
-import { theme } from "../config/theme";
 
 interface AddGoalModalProps {
   visible: boolean;
@@ -57,7 +58,7 @@ export default function AddGoalModal({
     >
       <View style={styles.overlay}>
         <View style={styles.modal}>
-          <Text style={styles.title}>Add a Dream</Text>
+          <ThemedText style={styles.title}>Add a Dream</ThemedText>
 
           <TextInput
             value={title}
@@ -68,7 +69,7 @@ export default function AddGoalModal({
             autoFocus
           />
 
-          <Text style={styles.label}>Added By</Text>
+          <ThemedText style={styles.label}>Added By</ThemedText>
           <View style={styles.addedByContainer}>
             <TouchableOpacity
               onPress={() => setAddedBy("A")}
@@ -77,14 +78,14 @@ export default function AddGoalModal({
                 addedBy === "A" && styles.addedByButtonActive,
               ]}
             >
-              <Text
+              <ThemedText
                 style={[
                   styles.addedByText,
                   addedBy === "A" && styles.addedByTextActive,
                 ]}
               >
-                Partner A
-              </Text>
+                mina
+              </ThemedText>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setAddedBy("B")}
@@ -93,18 +94,18 @@ export default function AddGoalModal({
                 addedBy === "B" && styles.addedByButtonActive,
               ]}
             >
-              <Text
+              <ThemedText
                 style={[
                   styles.addedByText,
                   addedBy === "B" && styles.addedByTextActive,
                 ]}
               >
-                Partner B
-              </Text>
+                parsa
+              </ThemedText>
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.label}>Category</Text>
+          <ThemedText style={styles.label}>Category</ThemedText>
 
           <ScrollView
             horizontal
@@ -128,7 +129,7 @@ export default function AddGoalModal({
                   ]}
                 >
                   <Text style={styles.categoryIcon}>{cat.icon}</Text>
-                  <Text
+                  <ThemedText
                     style={[
                       styles.categoryText,
                       !isCustom &&
@@ -137,7 +138,7 @@ export default function AddGoalModal({
                     ]}
                   >
                     {cat.name}
-                  </Text>
+                  </ThemedText>
                 </TouchableOpacity>
               ))}
               <TouchableOpacity
@@ -150,14 +151,14 @@ export default function AddGoalModal({
                 ]}
               >
                 <Text style={styles.categoryIcon}>✏️</Text>
-                <Text
+                <ThemedText
                   style={[
                     styles.categoryText,
                     isCustom && styles.categoryTextActive,
                   ]}
                 >
                   Custom
-                </Text>
+                </ThemedText>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -177,14 +178,14 @@ export default function AddGoalModal({
               onPress={onClose}
               style={[styles.button, styles.cancelButton]}
             >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
+              <ThemedText style={styles.cancelButtonText}>Cancel</ThemedText>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleAdd}
               style={[styles.button, styles.addButton]}
               disabled={!title.trim()}
             >
-              <Text style={styles.addButtonText}>Add Dream</Text>
+              <ThemedText style={styles.addButtonText}>Add Dream</ThemedText>
             </TouchableOpacity>
           </View>
         </View>
@@ -226,7 +227,7 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.sm,
   },
   label: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "600",
     color: theme.colors.textSecondary,
     marginBottom: theme.spacing.sm,
@@ -238,7 +239,7 @@ const styles = StyleSheet.create({
   },
   addedByButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 6,
     borderRadius: 12,
     backgroundColor: theme.colors.background,
     alignItems: "center",
@@ -263,7 +264,7 @@ const styles = StyleSheet.create({
   },
   categoryButton: {
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 6,
     borderRadius: 12,
     backgroundColor: theme.colors.background,
     flexDirection: "row",
@@ -275,7 +276,8 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     color: theme.colors.textPrimary,
-    fontWeight: "500",
+    fontSize: 14,
+    fontWeight: "600",
   },
   categoryTextActive: {
     color: "white",
@@ -296,6 +298,7 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: theme.colors.textPrimary,
     fontWeight: "600",
+    fontSize: 16,
   },
   addButton: {
     backgroundColor: theme.colors.primary,
@@ -303,5 +306,6 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: "white",
     fontWeight: "600",
+    fontSize: 16,
   },
 });

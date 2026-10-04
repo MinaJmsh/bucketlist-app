@@ -6,11 +6,15 @@ const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(
-    "Missing Supabase environment variables. Check your .env file."
+    "Missing Supabase environment variables. Check your .env file.",
   );
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// "soon" / "someday" are the new buckets; week/month/year are kept
+// so your old rows still type-check
+export type Period = "soon" | "someday" | "week" | "month" | "year";
 
 // Database types
 export interface BucketItem {
@@ -19,7 +23,9 @@ export interface BucketItem {
   category: string;
   completed: boolean;
   added_by: string;
-  period: "week" | "month" | "year";
+  period: Period;
+  description: string | null; // new
+  photos: string[] | null; // new
   created_at: string;
   completed_at: string | null;
   updated_at: string;
@@ -29,5 +35,5 @@ export interface NewBucketItem {
   title: string;
   category: string;
   added_by: string;
-  period: "week" | "month" | "year";
+  period: Period;
 }

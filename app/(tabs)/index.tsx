@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -10,22 +11,47 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { MARGIN_LINE, PAPER, ROW_HEIGHT } from "../../config/paper";
 import { theme } from "../../config/theme";
 import { BucketItem, NewBucketItem, supabase } from "../../lib/supabase";
-import AddGoalModal from "../components/AddGoalModal";
+import DreamModal from "../components/DreamModal";
 import GoalItem from "../components/GoalItem";
-import ProgressRing from "../components/ProgressRing";
+import MemoryModal, { MemoryValues } from "../components/MemoryModal";
+import { GridPaper, StickerLayer } from "../components/PaperDecor";
+import Polaroid from "../components/Polaroid";
+import TopBar, { MenuItem } from "../components/TopBar";
 
-type Period = "week" | "month" | "year";
+type Bucket = "soon" | "someday";
+type PageTab = "dreams" | "memories";
+
+// legacy values (week/month/year) still work
+const bucketOf = (g: BucketItem): Bucket =>
+  g.period === "year" || g.period === "someday" ? "someday" : "soon";
+
+const MENU_ITEMS: MenuItem[] = [
+  { id: "dreams", label: "Our dreams", emoji: "📖" },
+  { id: "games", label: "Games", emoji: "🎲", comingSoon: true },
+  { id: "ideas", label: "Idea box", emoji: "💡", comingSoon: true },
+];
+
+const HOLES = 8;
 
 export default function Index() {
   const [goals, setGoals] = useState<BucketItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("active");
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [activePeriod, setActivePeriod] = useState<Period>("week");
+  const [pageTab, setPageTab] = useState<PageTab>("dreams");
 
-  // Load goals from Supabase
+  const [dreamModal, setDreamModal] = useState<{
+    open: boolean;
+    goal: BucketItem | null;
+  }>({ open: false, goal: null });
+
+  const [memoryModal, setMemoryModal] = useState<{
+    open: boolean;
+    mode: "complete" | "edit";
+    goal: BucketItem | null;
+  }>({ open: false, mode: "complete", goal: null });
+
   useEffect(() => {
     loadGoals();
   }, []);
@@ -48,91 +74,138 @@ export default function Index() {
     }
   };
 
-  // Filter goals by active period
-  const periodGoals = goals.filter((g) => g.period === activePeriod);
-  const completedGoals = periodGoals.filter((g) => g.completed);
-  const activeGoals = periodGoals.filter((g) => !g.completed);
-  const progress =
-    periodGoals.length > 0
-      ? (completedGoals.length / periodGoals.length) * 100
-      : 0;
-
-  const toggleGoal = async (id: string) => {
-    const goal = goals.find((g) => g.id === id);
-    if (!goal) return;
-
-    const newCompleted = !goal.completed;
-    const updates = {
-      completed: newCompleted,
-      completed_at: newCompleted ? new Date().toISOString() : null,
-      updated_at: new Date().toISOString(),
-    };
-
-    try {
-      const { error } = await supabase
-        .from("bucket_items")
-        .update(updates)
-        .eq("id", id);
-
-      if (error) throw error;
-
-      setGoals(goals.map((g) => (g.id === id ? { ...g, ...updates } : g)));
-    } catch (error) {
-      console.error("Error toggling goal:", error);
-      Alert.alert("Error", "Failed to update item");
-    }
+  // generic update helper (throws so callers can show their own message)
+  const patchGoal = async (id: string, patch: Partial<BucketItem>) => {
+    const updates = { ...patch, updated_at: new Date().toISOString() };
+    const { error } = await supabase
+      .from("bucket_items")
+      .update(updates)
+      .eq("id", id);
+    if (error) throw error;
+    setGoals((prev) =>
+      prev.map((g) => (g.id === id ? { ...g, ...updates } : g)),
+    );
   };
 
-  const deleteGoal = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from("bucket_items")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
-
-      setGoals(goals.filter((g) => g.id !== id));
-    } catch (error) {
-      console.error("Error deleting goal:", error);
-      Alert.alert("Error", "Failed to delete item");
-    }
-  };
-
-  const addNewGoal = async (newGoal: NewBucketItem) => {
+  const addGoal = async (values: NewBucketItem) => {
     try {
       const { data, error } = await supabase
         .from("bucket_items")
-        .insert([
-          {
-            ...newGoal,
-            period: activePeriod,
-          },
-        ])
+        .insert([values])
         .select()
         .single();
-
       if (error) throw error;
-
-      setGoals([data, ...goals]);
+      setGoals((prev) => [data, ...prev]);
+      setPageTab("dreams");
     } catch (error) {
       console.error("Error adding goal:", error);
       Alert.alert("Error", "Failed to add item");
     }
   };
 
-  const displayGoals = activeTab === "active" ? activeGoals : completedGoals;
+  const saveDream = async (values: NewBucketItem) => {
+    const goal = dreamModal.goal;
+    if (!goal) return addGoal(values);
+    try {
+      await patchGoal(goal.id, values);
+    } catch (error) {
+      console.error("Error updating dream:", error);
+      Alert.alert("Error", "Failed to update dream");
+    }
+  };
+
+  const deleteGoal = async (id: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("bucket_items")
+        .delete()
+        .eq("id", id)
+        .select();
+
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error(
+          "No rows deleted. Check the delete policy in Supabase.",
+        );
+      }
+
+      setGoals((prev) => prev.filter((g) => g.id !== id));
+    } catch (error) {
+      console.error("Error deleting goal:", error);
+      Alert.alert("Error", "Couldn't tear that one out. Try again?");
+    }
+  };
+
+  const saveMemory = async (values: MemoryValues) => {
+    const goal = memoryModal.goal;
+    if (!goal) return;
+    if (memoryModal.mode === "complete") {
+      await patchGoal(goal.id, {
+        ...values,
+        completed: true,
+        completed_at: new Date().toISOString(),
+      });
+      setPageTab("memories");
+    } else {
+      await patchGoal(goal.id, values);
+    }
+  };
+
+  const moveBackToDreams = async (goal: BucketItem) => {
+    try {
+      await patchGoal(goal.id, { completed: false, completed_at: null });
+      setMemoryModal((m) => ({ ...m, open: false }));
+      setPageTab("dreams");
+    } catch (error) {
+      console.error("Error moving back:", error);
+      Alert.alert("Error", "Failed to update item");
+    }
+  };
+
+  const openDream = (goal: BucketItem) => setDreamModal({ open: true, goal });
+  const openComplete = (goal: BucketItem) =>
+    setMemoryModal({ open: true, mode: "complete", goal });
+  const openMemory = (goal: BucketItem) =>
+    setMemoryModal({ open: true, mode: "edit", goal });
+
+  const activeGoals = goals.filter((g) => !g.completed);
+  const memories = goals
+    .filter((g) => g.completed)
+    .sort(
+      (a, b) =>
+        new Date(b.completed_at || 0).getTime() -
+        new Date(a.completed_at || 0).getTime(),
+    );
+  const soonGoals = activeGoals.filter((g) => bucketOf(g) === "soon");
+  const somedayGoals = activeGoals.filter((g) => bucketOf(g) === "someday");
 
   if (loading) {
     return (
       <View style={[styles.container, styles.centerContent]}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
         <ThemedText style={styles.loadingText}>
-          Loading your bucket list...
+          Opening your notebook...
         </ThemedText>
       </View>
     );
   }
+
+  const renderDreamSection = (title: string, items: BucketItem[]) =>
+    items.length > 0 && (
+      <View>
+        <View style={styles.sectionHeader}>
+          <ThemedText style={styles.sectionTitle}>{title}</ThemedText>
+        </View>
+        {items.map((goal) => (
+          <GoalItem
+            key={goal.id}
+            goal={goal}
+            onOpen={openDream}
+            onComplete={openComplete}
+          />
+        ))}
+      </View>
+    );
 
   return (
     <View style={styles.container}>
@@ -141,188 +214,150 @@ export default function Index() {
         backgroundColor={theme.colors.background}
       />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <ThemedText
-          style={styles.headerTitle}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-        >
-          MAP BUCKETLIST
-        </ThemedText>
+      <TopBar title="MAP BUCKETLIST" items={MENU_ITEMS} activeId="dreams" />
+
+      <View style={styles.notebook}>
+        {/* Folder tabs sticking out of the page */}
+        <View style={styles.tabRow}>
+          <TouchableOpacity
+            onPress={() => setPageTab("dreams")}
+            style={[styles.tab, pageTab === "dreams" && styles.tabActive]}
+          >
+            <ThemedText
+              style={[
+                styles.tabText,
+                pageTab === "dreams" && styles.tabTextActive,
+              ]}
+            >
+              📝 Dreams {activeGoals.length}
+            </ThemedText>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setPageTab("memories")}
+            style={[styles.tab, pageTab === "memories" && styles.tabActive]}
+          >
+            <ThemedText
+              style={[
+                styles.tabText,
+                pageTab === "memories" && styles.tabTextActive,
+              ]}
+            >
+              📸 Memories {memories.length}
+            </ThemedText>
+          </TouchableOpacity>
+        </View>
+
+        {/* The page */}
+        <View style={styles.page}>
+          {pageTab === "memories" ? (
+            <GridPaper />
+          ) : (
+            <View style={styles.marginLine} pointerEvents="none" />
+          )}
+          <View style={styles.holes} pointerEvents="none">
+            {Array.from({ length: HOLES }).map((_, i) => (
+              <View key={i} style={styles.hole} />
+            ))}
+          </View>
+
+          {pageTab === "dreams" ? (
+            <ScrollView
+              contentContainerStyle={styles.dreamsContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {activeGoals.length === 0 && (
+                <View style={styles.emptyState}>
+                  <ThemedText style={styles.emptyText}>
+                    nothing written yet...{"\n"}tap + to add our first dream ✏️
+                  </ThemedText>
+                </View>
+              )}
+
+              {renderDreamSection("🌷 Soon", soonGoals)}
+              {renderDreamSection("🌙 Someday", somedayGoals)}
+
+              {activeGoals.length > 0 && (
+                <ThemedText style={styles.hint}>
+                  tap a line to edit · tap the circle when we've done it
+                </ThemedText>
+              )}
+            </ScrollView>
+          ) : (
+            <ScrollView
+              contentContainerStyle={styles.memoriesContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {memories.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <ThemedText style={styles.emptyText}>
+                    no polaroids yet...{"\n"}finish a dream to stick one here 📸
+                  </ThemedText>
+                </View>
+              ) : (
+                <>
+                  <View style={styles.polaroidGrid}>
+                    {memories.map((goal, i) => (
+                      <Polaroid
+                        key={goal.id}
+                        goal={goal}
+                        index={i}
+                        onPress={openMemory}
+                      />
+                    ))}
+                  </View>
+                  <ThemedText style={styles.hint}>
+                    tap a polaroid to edit
+                  </ThemedText>
+                </>
+              )}
+              <StickerLayer
+                count={Math.max(2, Math.ceil(memories.length / 2) + 1)}
+              />
+            </ScrollView>
+          )}
+        </View>
       </View>
 
-      <ScrollView style={styles.scrollView}>
-        <View style={styles.content}>
-          {/* Main Stats Card */}
-          <View style={styles.statsCard}>
-            <View style={styles.mainStats}>
-              <View style={styles.leftStat}>
-                <ThemedText style={styles.statIcon}>❤️</ThemedText>
-                <ThemedText style={styles.statNumber}>
-                  {completedGoals.length}
-                </ThemedText>
-                <ThemedText style={styles.statLabel}>
-                  DREAMS{"\n"}COMPLETE
-                </ThemedText>
-              </View>
-
-              <View style={styles.rightStat}>
-                <ProgressRing progress={progress} />
-                <TouchableOpacity style={styles.normalButton}>
-                  <ThemedText style={styles.normalText}>
-                    {activeGoals.length} TO GO
-                  </ThemedText>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Progress Bar */}
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${progress}%` }]} />
-            </View>
-
-            {/* Mini Stats */}
-            <View style={styles.miniStats}>
-              <View style={styles.miniStatCard}>
-                <ThemedText style={styles.miniStatValue}>
-                  {completedGoals.length}
-                </ThemedText>
-                <ThemedText style={styles.miniStatLabel}>Done</ThemedText>
-              </View>
-              <View style={styles.miniStatCard}>
-                <ThemedText style={styles.miniStatValue}>
-                  {activeGoals.length}
-                </ThemedText>
-                <ThemedText style={styles.miniStatLabel}>Active</ThemedText>
-              </View>
-              <View style={styles.miniStatCard}>
-                <ThemedText style={styles.miniStatValue}>
-                  {periodGoals.length}
-                </ThemedText>
-                <ThemedText style={styles.miniStatLabel}>Total</ThemedText>
-              </View>
-            </View>
-          </View>
-
-          {/* Time Period Buttons */}
-          <View style={styles.periodButtons}>
-            <TouchableOpacity
-              style={[
-                styles.periodButton,
-                activePeriod === "week" && styles.periodActive,
-              ]}
-              onPress={() => setActivePeriod("week")}
-            >
-              <ThemedText
-                style={[
-                  styles.periodText,
-                  activePeriod === "week" && styles.periodTextActive,
-                ]}
-              >
-                THIS WEEK
-              </ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.periodButton,
-                activePeriod === "month" && styles.periodActive,
-              ]}
-              onPress={() => setActivePeriod("month")}
-            >
-              <ThemedText
-                style={[
-                  styles.periodText,
-                  activePeriod === "month" && styles.periodTextActive,
-                ]}
-              >
-                THIS MONTH
-              </ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.periodButton,
-                activePeriod === "year" && styles.periodActive,
-              ]}
-              onPress={() => setActivePeriod("year")}
-            >
-              <ThemedText
-                style={[
-                  styles.periodText,
-                  activePeriod === "year" && styles.periodTextActive,
-                ]}
-              >
-                THIS YEAR
-              </ThemedText>
-            </TouchableOpacity>
-          </View>
-
-          {/* Tabs */}
-          <View style={styles.tabContainer}>
-            <TouchableOpacity
-              onPress={() => setActiveTab("active")}
-              style={[styles.tab, activeTab === "active" && styles.tabActive]}
-            >
-              <ThemedText
-                style={[
-                  styles.tabText,
-                  activeTab === "active" && styles.tabTextActive,
-                ]}
-              >
-                Active
-              </ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setActiveTab("memories")}
-              style={[styles.tab, activeTab === "memories" && styles.tabActive]}
-            >
-              <ThemedText
-                style={[
-                  styles.tabText,
-                  activeTab === "memories" && styles.tabTextActive,
-                ]}
-              >
-                Memories
-              </ThemedText>
-            </TouchableOpacity>
-          </View>
-
-          {displayGoals.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyIcon}>🎯</Text>
-              <ThemedText style={styles.emptyText}>
-                {activeTab === "active"
-                  ? "No active dreams yet. Tap + to add one!"
-                  : "No completed dreams yet. Start checking them off!"}
-              </ThemedText>
-            </View>
-          ) : (
-            displayGoals.map((goal) => (
-              <GoalItem
-                key={goal.id}
-                goal={goal}
-                onToggle={toggleGoal}
-                onDelete={deleteGoal}
-              />
-            ))
-          )}
-
-          <View style={{ height: 100 }} />
-        </View>
-      </ScrollView>
-
-      {/* Floating Add Button */}
       <TouchableOpacity
         style={styles.floatingButton}
-        onPress={() => setShowAddModal(true)}
+        onPress={() => setDreamModal({ open: true, goal: null })}
       >
         <Text style={styles.plusIcon}>+</Text>
       </TouchableOpacity>
 
-      <AddGoalModal
-        visible={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        onAdd={addNewGoal}
+      <DreamModal
+        visible={dreamModal.open}
+        goal={dreamModal.goal}
+        onClose={() => setDreamModal((m) => ({ ...m, open: false }))}
+        onSave={saveDream}
+        onDelete={() => {
+          if (dreamModal.goal) deleteGoal(dreamModal.goal.id);
+          setDreamModal((m) => ({ ...m, open: false }));
+        }}
+        onComplete={() => {
+          const goal = dreamModal.goal;
+          setDreamModal((m) => ({ ...m, open: false }));
+          if (goal) {
+            // iOS needs a beat between two sheets; web/android don't
+            setTimeout(
+              () => openComplete(goal),
+              Platform.OS === "ios" ? 350 : 0,
+            );
+          }
+        }}
+      />
+
+      <MemoryModal
+        visible={memoryModal.open}
+        mode={memoryModal.mode}
+        goal={memoryModal.goal}
+        onClose={() => setMemoryModal((m) => ({ ...m, open: false }))}
+        onSave={saveMemory}
+        onUndo={() => memoryModal.goal && moveBackToDreams(memoryModal.goal)}
+        onDelete={() => {
+          if (memoryModal.goal) deleteGoal(memoryModal.goal.id);
+          setMemoryModal((m) => ({ ...m, open: false }));
+        }}
       />
     </View>
   );
@@ -342,187 +377,122 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: theme.colors.textSecondary,
   },
-  header: {
-    width: "100%", // full width of the screen
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row", // keeps everything in one row
-  },
-
-  headerTitle: {
-    fontSize: 20,
-    textAlign: "center",
-    flexShrink: 1,
-  },
-
-  scrollView: {
+  notebook: {
     flex: 1,
+    marginHorizontal: 14,
+    marginBottom: 14,
   },
-  content: {
-    padding: 20,
-  },
-  statsCard: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: 28,
-    padding: 24,
-    marginBottom: 20,
-    borderWidth: 2.5,
-    borderColor: theme.colors.border,
-  },
-  mainStats: {
+  tabRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 20,
-  },
-  leftStat: {
-    flex: 1,
-  },
-  statIcon: {
-    fontSize: 28,
-    marginBottom: 8,
-  },
-  statNumber: {
-    fontSize: 42,
-    // fontWeight: "700",
-    color: theme.colors.textPrimary,
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 20,
-    // fontWeight: "600",
-    color: theme.colors.textSecondary,
-    letterSpacing: 0.5,
-    lineHeight: 24,
-  },
-  rightStat: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  normalButton: {
-    marginTop: 12,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  normalText: {
-    fontSize: 16,
-    // fontWeight: "700",
-    color: theme.colors.textPrimary,
-    letterSpacing: 0.5,
-  },
-  progressBar: {
-    height: 14,
-    backgroundColor: "#F5F5F5",
-    borderRadius: 20,
-    overflow: "hidden",
-    marginBottom: 20,
-  },
-  progressFill: {
-    height: "100%",
-    backgroundColor: theme.colors.primary,
-    borderRadius: 20,
-  },
-  miniStats: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  miniStatCard: {
-    flex: 1,
-    backgroundColor: "#FAFAFA",
-    borderRadius: 18,
-    padding: 14,
-    borderWidth: 2,
-    borderColor: "#E8E8E8",
-    alignItems: "center",
-  },
-  miniStatValue: {
-    fontSize: 28,
-    // fontWeight: "700",
-    color: theme.colors.textPrimary,
-    marginBottom: 4,
-  },
-  miniStatLabel: {
-    fontSize: 18,
-    // fontWeight: "600",
-    color: theme.colors.textSecondary,
-  },
-  periodButtons: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 20,
-  },
-  periodButton: {
-    flex: 1,
-    paddingVertical: 11,
-    borderRadius: 14,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 2,
-    borderColor: "#E8E8E8",
-    alignItems: "center",
-  },
-  periodActive: {
-    backgroundColor: theme.colors.border,
-    borderColor: theme.colors.border,
-  },
-  periodText: {
-    fontSize: 12,
-    // fontWeight: "700",
-    color: theme.colors.textSecondary,
-    letterSpacing: 0.5,
-  },
-  periodTextActive: {
-    color: theme.colors.surface,
-  },
-  tabContainer: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: theme.spacing.lg,
+    gap: 6,
+    paddingLeft: 14,
+    marginBottom: -2.5,
+    zIndex: 2,
   },
   tab: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 18,
-    backgroundColor: theme.colors.surface,
-    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
     borderWidth: 2.5,
     borderColor: theme.colors.border,
+    backgroundColor: "#EADFC8",
   },
   tabActive: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.border,
+    backgroundColor: PAPER,
+    borderBottomWidth: 0,
+    paddingBottom: 11.5,
   },
   tabText: {
-    color: theme.colors.textPrimary,
-    // fontWeight: "700",
-    fontSize: 18,
+    fontSize: 17,
+    color: theme.colors.textSecondary,
   },
   tabTextActive: {
-    color: "white",
+    color: theme.colors.textPrimary,
+  },
+  page: {
+    flex: 1,
+    backgroundColor: PAPER,
+    borderWidth: 2.5,
+    borderColor: theme.colors.border,
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 20,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    overflow: "hidden",
+  },
+  marginLine: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 52,
+    width: 2,
+    backgroundColor: MARGIN_LINE,
+    opacity: 0.8,
+  },
+  holes: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 14,
+    justifyContent: "space-around",
+    paddingVertical: 18,
+  },
+  hole: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: theme.colors.background,
+    borderWidth: 1.5,
+    borderColor: "#D9CDB4",
+  },
+  dreamsContent: {
+    paddingLeft: 66,
+    paddingRight: 18,
+    paddingTop: 10,
+    paddingBottom: 120,
+  },
+  memoriesContent: {
+    paddingLeft: 40,
+    paddingRight: 18,
+    paddingTop: 28,
+    paddingBottom: 120,
+  },
+  sectionHeader: {
+    height: ROW_HEIGHT,
+    justifyContent: "center",
+  },
+  sectionTitle: {
+    fontFamily: "IndieFlower",
+    fontSize: 26,
+    color: theme.colors.textPrimary,
+  },
+  polaroidGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+  hint: {
+    marginTop: 16,
+    fontSize: 14,
+    textAlign: "center",
+    color: theme.colors.textSecondary,
+    opacity: 0.7,
   },
   emptyState: {
     alignItems: "center",
     paddingVertical: 48,
   },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
   emptyText: {
-    fontSize: 16,
+    fontSize: 20,
+    lineHeight: 28,
     color: theme.colors.textSecondary,
     textAlign: "center",
-    paddingHorizontal: 32,
   },
   floatingButton: {
     position: "absolute",
-    right: 20,
-    bottom: 30,
+    right: 28,
+    bottom: 50,
     width: 60,
     height: 60,
     borderRadius: 30,

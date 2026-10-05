@@ -1,4 +1,12 @@
 import { ThemedText } from "@/components/themed-text";
+import {
+  Camera,
+  PartyPopper,
+  Pencil,
+  Pin,
+  Scissors,
+  X,
+} from "@sketchyicons/react-native";
 import { Image } from "expo-image";
 import type { ImagePickerAsset } from "expo-image-picker";
 import React, { useEffect, useState } from "react";
@@ -9,7 +17,6 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
@@ -35,7 +42,6 @@ interface MemoryModalProps {
   goal: BucketItem | null;
   onClose: () => void;
   onSave: (values: MemoryValues) => Promise<void>;
-  onUndo?: () => void;
   onDelete?: () => void;
 }
 
@@ -45,7 +51,6 @@ export default function MemoryModal({
   goal,
   onClose,
   onSave,
-  onUndo,
   onDelete,
 }: MemoryModalProps) {
   const [title, setTitle] = useState("");
@@ -108,6 +113,7 @@ export default function MemoryModal({
   };
 
   const isComplete = mode === "complete";
+  const HeadingIcon = isComplete ? PartyPopper : Pencil;
 
   return (
     <Modal
@@ -124,9 +130,12 @@ export default function MemoryModal({
           {/* Header: title + small icon buttons */}
           <View style={styles.headerRow}>
             <View style={styles.headingBox}>
-              <ThemedText style={styles.heading}>
-                {isComplete ? "We did it! 🎉" : "Edit this memory ✏️"}
-              </ThemedText>
+              <View style={styles.headingLine}>
+                <HeadingIcon size={26} color={theme.colors.textPrimary} />
+                <ThemedText style={styles.heading}>
+                  {isComplete ? "We did it!" : "Edit this memory"}
+                </ThemedText>
+              </View>
               <ThemedText style={styles.subheading}>
                 {isComplete
                   ? "Write a little note and stick some photos in."
@@ -140,7 +149,7 @@ export default function MemoryModal({
                   onPress={() => setConfirming(true)}
                   accessibilityLabel="Tear out this memory"
                 >
-                  <Text style={styles.iconText}>✂️</Text>
+                  <Scissors size={18} color={theme.colors.textPrimary} />
                 </TouchableOpacity>
               )}
               <TouchableOpacity
@@ -149,7 +158,7 @@ export default function MemoryModal({
                 disabled={saving}
                 accessibilityLabel="Close"
               >
-                <Text style={styles.iconText}>✕</Text>
+                <X size={18} color={theme.colors.textPrimary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -188,7 +197,7 @@ export default function MemoryModal({
               contentContainerStyle={styles.photoStripContent}
             >
               <TouchableOpacity style={styles.addPhoto} onPress={addPhotos}>
-                <Text style={styles.addPhotoIcon}>📷</Text>
+                <Camera size={26} color={theme.colors.textSecondary} />
                 <ThemedText style={styles.addPhotoText}>add</ThemedText>
               </TouchableOpacity>
               {photos.map((p, i) => (
@@ -203,7 +212,7 @@ export default function MemoryModal({
                     onPress={() => removePhoto(i)}
                     hitSlop={8}
                   >
-                    <Text style={styles.removePhotoText}>✕</Text>
+                    <X size={12} color="white" strokeWidth={3} />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -213,7 +222,6 @@ export default function MemoryModal({
               <ThemedText style={styles.errorText}>{error}</ThemedText>
             )}
 
-            {/* Footer */}
             <TouchableOpacity
               onPress={handleSave}
               style={[styles.primaryButton, !title.trim() && { opacity: 0.5 }]}
@@ -222,23 +230,14 @@ export default function MemoryModal({
               {saving ? (
                 <ActivityIndicator color="white" />
               ) : (
-                <ThemedText style={styles.primaryText}>
-                  {isComplete ? "Stick it in 📌" : "Save changes"}
-                </ThemedText>
+                <>
+                  {isComplete && <Pin size={18} color="white" />}
+                  <ThemedText style={styles.primaryText}>
+                    {isComplete ? "Stick it in" : "Save changes"}
+                  </ThemedText>
+                </>
               )}
             </TouchableOpacity>
-
-            {!isComplete && (
-              <TouchableOpacity
-                onPress={() => onUndo?.()}
-                style={styles.secondaryButton}
-                disabled={saving}
-              >
-                <ThemedText style={styles.secondaryText}>
-                  ↩︎ Back to dreams
-                </ThemedText>
-              </TouchableOpacity>
-            )}
           </ScrollView>
         </View>
 
@@ -284,7 +283,13 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingRight: 8,
   },
+  headingLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   heading: {
+    flexShrink: 1,
     fontFamily: "IndieFlower",
     fontSize: 28,
     color: theme.colors.textPrimary,
@@ -306,10 +311,6 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     alignItems: "center",
     justifyContent: "center",
-  },
-  iconText: {
-    fontSize: 16,
-    color: theme.colors.textPrimary,
   },
   label: {
     fontSize: 16,
@@ -346,10 +347,8 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     alignItems: "center",
     justifyContent: "center",
+    gap: 2,
     backgroundColor: "white",
-  },
-  addPhotoIcon: {
-    fontSize: 24,
   },
   addPhotoText: {
     fontSize: 13,
@@ -380,11 +379,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  removePhotoText: {
-    color: "white",
-    fontSize: 11,
-    fontWeight: "700",
-  },
   errorText: {
     color: "#D9534F",
     textAlign: "center",
@@ -393,25 +387,14 @@ const styles = StyleSheet.create({
   primaryButton: {
     paddingVertical: 15,
     borderRadius: 16,
+    flexDirection: "row",
+    justifyContent: "center",
     alignItems: "center",
+    gap: 8,
     backgroundColor: theme.colors.primary,
   },
   primaryText: {
     color: "white",
-    fontWeight: "600",
-    fontSize: 17,
-  },
-  secondaryButton: {
-    marginTop: 10,
-    paddingVertical: 13,
-    borderRadius: 16,
-    alignItems: "center",
-    backgroundColor: "white",
-    borderWidth: 2.5,
-    borderColor: theme.colors.border,
-  },
-  secondaryText: {
-    color: theme.colors.textPrimary,
     fontWeight: "600",
     fontSize: 17,
   },

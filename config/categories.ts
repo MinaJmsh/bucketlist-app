@@ -41,7 +41,7 @@ export const getCategoryColor = (category: string) => {
   ];
   const index =
     Math.abs(
-      category.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)
+      category.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0),
     ) % colors.length;
   return colors[index];
 };

@@ -51,24 +51,31 @@ const rand = (n: number) => {
   return x - Math.floor(x);
 };
 
-export function StickerLayer({ count }: { count: number }) {
+export function StickerLayer({
+  count,
+  seed = 0,
+}: {
+  count: number;
+  seed?: number;
+}) {
   return (
     <>
       {Array.from({ length: count }).map((_, i) => {
-        const emoji = STICKERS[Math.floor(rand(i + 1) * STICKERS.length)];
-        const side = 4 + rand(i + 9) * 10;
+        const n = i + seed * 13;
+        const emoji = STICKERS[Math.floor(rand(n + 1) * STICKERS.length)];
+        const side = 4 + rand(n + 9) * 10;
         return (
           <View
             key={i}
             pointerEvents="none"
             style={{
               position: "absolute",
-              top: 30 + i * 230 + rand(i + 7) * 70,
+              top: 30 + i * 230 + rand(n + 7) * 70,
               ...(i % 2 === 1 ? { left: side } : { right: side }),
-              transform: [{ rotate: `${(rand(i + 3) - 0.5) * 50}deg` }],
+              transform: [{ rotate: `${(rand(n + 3) - 0.5) * 50}deg` }],
             }}
           >
-            <Text style={{ fontSize: 32 + rand(i + 5) * 16 }}>{emoji}</Text>
+            <Text style={{ fontSize: 32 + rand(n + 5) * 16 }}>{emoji}</Text>
           </View>
         );
       })}

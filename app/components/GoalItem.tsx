@@ -1,7 +1,6 @@
 import { ThemedText } from "@/components/themed-text";
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { getCategoryIcon } from "../../config/categories";
+import { Image, StyleSheet, TouchableOpacity } from "react-native";
 import { ROW_HEIGHT, RULE_LINE } from "../../config/paper";
 import { theme } from "../../config/theme";
 import { BucketItem } from "../../lib/supabase";
@@ -25,27 +24,20 @@ export default function GoalItem({ goal, onOpen, onComplete }: GoalItemProps) {
         style={styles.checkbox}
       />
 
-      <Text style={styles.icon}>{getCategoryIcon(goal.category)}</Text>
+      {/* <Text style={styles.icon}>{getCategoryIcon(goal.category)}</Text> */}
 
       <ThemedText numberOfLines={1} style={styles.title}>
         {goal.title}
       </ThemedText>
 
-      <View
-        style={[
-          styles.badge,
-          {
-            backgroundColor:
-              goal.added_by === "A"
-                ? theme.colors.accent
-                : theme.colors.secondary,
-          },
-        ]}
-      >
-        <Text style={styles.badgeText}>
-          {goal.added_by === "A" ? "M" : goal.added_by === "B" ? "P" : "?"}
-        </Text>
-      </View>
+      <Image
+        source={
+          goal.added_by === "A"
+            ? require("../../assets/images/mina2.png")
+            : require("../../assets/images/parsa2.png")
+        }
+        style={styles.personImage}
+      />
     </TouchableOpacity>
   );
 }
@@ -75,16 +67,20 @@ const styles = StyleSheet.create({
     fontSize: 21,
     color: theme.colors.textPrimary,
   },
-  badge: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: "white",
+  // badge: {
+  //   width: 20,
+  //   height: 20,
+  //   borderRadius: 10,
+  //   alignItems: "center",
+  //   justifyContent: "center",
+  // },
+  // badgeText: {
+  //   fontSize: 10,
+  //   fontWeight: "600",
+  //   color: "white",
+  personImage: {
+    width: 28,
+    height: 28,
+    resizeMode: "contain",
   },
 });

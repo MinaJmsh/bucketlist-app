@@ -1,6 +1,16 @@
 import { ThemedText } from "@/components/themed-text";
+import {
+  Flower2,
+  Moon,
+  PartyPopper,
+  Pencil,
+  Scissors,
+  Sparkles,
+  X,
+} from "@sketchyicons/react-native";
 import React, { useEffect, useState } from "react";
 import {
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -18,9 +28,9 @@ import ConfirmDialog from "./ConfirmDialog";
 
 type Period = "soon" | "someday";
 
-const PERIODS: { key: Period; label: string }[] = [
-  { key: "soon", label: "🌷 soon" },
-  { key: "someday", label: "🌙 someday" },
+const PERIODS: { key: Period; label: string; Icon: typeof Flower2 }[] = [
+  { key: "soon", label: "soon", Icon: Flower2 },
+  { key: "someday", label: "someday", Icon: Moon },
 ];
 
 interface DreamModalProps {
@@ -67,6 +77,8 @@ export default function DreamModal({
     onClose();
   };
 
+  const HeadingIcon = editing ? Pencil : Sparkles;
+
   return (
     <Modal
       visible={visible}
@@ -81,9 +93,12 @@ export default function DreamModal({
         <View style={styles.sheet}>
           {/* Header: title + small icon buttons */}
           <View style={styles.headerRow}>
-            <ThemedText style={styles.heading}>
-              {editing ? "Edit this dream ✏️" : "Write a new dream ✨"}
-            </ThemedText>
+            <View style={styles.headingBox}>
+              <HeadingIcon size={26} color={theme.colors.textPrimary} />
+              <ThemedText style={styles.heading}>
+                {editing ? "Edit this dream" : "Write a new dream"}
+              </ThemedText>
+            </View>
             <View style={styles.headerActions}>
               {editing && (
                 <TouchableOpacity
@@ -91,7 +106,7 @@ export default function DreamModal({
                   onPress={() => setConfirming(true)}
                   accessibilityLabel="Tear out this dream"
                 >
-                  <Text style={styles.iconText}>✂️</Text>
+                  <Scissors size={18} color={theme.colors.textPrimary} />
                 </TouchableOpacity>
               )}
               <TouchableOpacity
@@ -99,7 +114,7 @@ export default function DreamModal({
                 onPress={onClose}
                 accessibilityLabel="Close"
               >
-                <Text style={styles.iconText}>✕</Text>
+                <X size={18} color={theme.colors.textPrimary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -116,19 +131,32 @@ export default function DreamModal({
               style={styles.input}
               autoFocus={!editing}
             />
-
             <ThemedText style={styles.label}>When?</ThemedText>
-            <View style={styles.pillRow}>
+
+            <View style={styles.optionsRow}>
               {PERIODS.map((p) => (
                 <TouchableOpacity
                   key={p.key}
                   onPress={() => setPeriod(p.key)}
-                  style={[styles.pill, period === p.key && styles.pillActive]}
+                  style={[
+                    styles.optionButton,
+                    period === p.key && styles.optionButtonActive,
+                  ]}
+                  activeOpacity={0.8}
                 >
+                  <p.Icon
+                    size={28}
+                    color={
+                      period === p.key
+                        ? theme.colors.primary
+                        : theme.colors.textPrimary
+                    }
+                  />
+
                   <ThemedText
                     style={[
-                      styles.pillText,
-                      period === p.key && styles.pillTextActive,
+                      styles.optionLabel,
+                      period === p.key && styles.optionLabelActive,
                     ]}
                   >
                     {p.label}
@@ -138,23 +166,35 @@ export default function DreamModal({
             </View>
 
             <ThemedText style={styles.label}>Written by</ThemedText>
-            <View style={styles.pillRow}>
+
+            <View style={styles.optionsRow}>
               {[
-                { key: "A", label: "mina" },
-                { key: "B", label: "parsa" },
+                {
+                  key: "A",
+                  label: "mina",
+                  image: require("../../assets/images/mina2.png"),
+                },
+                {
+                  key: "B",
+                  label: "parsa",
+                  image: require("../../assets/images/parsa2.png"),
+                },
               ].map((who) => (
                 <TouchableOpacity
                   key={who.key}
                   onPress={() => setAddedBy(who.key)}
                   style={[
-                    styles.pill,
-                    addedBy === who.key && styles.pillActive,
+                    styles.optionButton,
+                    addedBy === who.key && styles.optionButtonActive,
                   ]}
+                  activeOpacity={0.8}
                 >
+                  <Image source={who.image} style={styles.personImage} />
+
                   <ThemedText
                     style={[
-                      styles.pillText,
-                      addedBy === who.key && styles.pillTextActive,
+                      styles.optionLabel,
+                      addedBy === who.key && styles.optionLabelActive,
                     ]}
                   >
                     {who.label}
@@ -176,10 +216,12 @@ export default function DreamModal({
                     onPress={() => setCategory(cat.id)}
                     style={[
                       styles.categoryButton,
-                      category === cat.id && { backgroundColor: cat.color },
+                      category === cat.id && styles.categoryButtonActive,
                     ]}
+                    activeOpacity={0.8}
                   >
                     <Text style={styles.categoryIcon}>{cat.icon}</Text>
+
                     <ThemedText
                       style={[
                         styles.categoryText,
@@ -209,9 +251,8 @@ export default function DreamModal({
                 onPress={() => onComplete?.()}
                 style={styles.secondaryButton}
               >
-                <ThemedText style={styles.secondaryText}>
-                  🎉 We did it!
-                </ThemedText>
+                <PartyPopper size={20} color={theme.colors.textPrimary} />
+                <ThemedText style={styles.secondaryText}>We did it!</ThemedText>
               </TouchableOpacity>
             )}
           </ScrollView>
@@ -255,8 +296,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: theme.spacing.lg,
   },
-  heading: {
+  headingBox: {
     flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  heading: {
+    flexShrink: 1,
     fontFamily: "IndieFlower",
     fontSize: 28,
     color: theme.colors.textPrimary,
@@ -275,10 +322,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  iconText: {
-    fontSize: 16,
-    color: theme.colors.textPrimary,
-  },
   input: {
     borderRadius: 16,
     backgroundColor: "white",
@@ -294,29 +337,7 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     marginBottom: theme.spacing.sm,
   },
-  pillRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: theme.spacing.md,
-  },
-  pill: {
-    flex: 1,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: "white",
-    alignItems: "center",
-  },
-  pillActive: {
-    backgroundColor: theme.colors.primary,
-  },
-  pillText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: theme.colors.textPrimary,
-  },
-  pillTextActive: {
-    color: "white",
-  },
+
   categoriesScroll: {
     marginBottom: theme.spacing.lg,
   },
@@ -325,25 +346,37 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   categoryButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 12,
+    width: 88,
+    height: 88,
+    borderRadius: 16,
     backgroundColor: "white",
-    flexDirection: "row",
+    borderWidth: 2.5,
+    borderColor: "transparent",
     alignItems: "center",
-    gap: 6,
+    justifyContent: "center",
+    padding: 8,
   },
+
+  categoryButtonActive: {
+    borderColor: theme.colors.primary,
+    backgroundColor: "#F3F6EC",
+  },
+
   categoryIcon: {
-    fontSize: 18,
+    fontSize: 28,
+    marginBottom: 2,
   },
+
   categoryText: {
     color: theme.colors.textPrimary,
     fontSize: 14,
     fontWeight: "600",
   },
+
   categoryTextActive: {
-    color: "white",
+    color: theme.colors.primary,
   },
+
   primaryButton: {
     paddingVertical: 15,
     borderRadius: 16,
@@ -359,7 +392,10 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingVertical: 13,
     borderRadius: 16,
+    flexDirection: "row",
+    justifyContent: "center",
     alignItems: "center",
+    gap: 8,
     backgroundColor: "white",
     borderWidth: 2.5,
     borderColor: theme.colors.border,
@@ -368,5 +404,54 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
     fontWeight: "600",
     fontSize: 17,
+  },
+  peopleRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: theme.spacing.md,
+  },
+
+  personLabelActive: {
+    color: theme.colors.primary,
+  },
+  optionsRow: {
+    flexDirection: "row",
+    gap: 12,
+    width: "100%",
+    marginBottom: theme.spacing.md,
+  },
+
+  optionButton: {
+    flex: 1,
+    height: 88,
+    borderRadius: 16,
+    backgroundColor: "white",
+    borderWidth: 2.5,
+    borderColor: "transparent",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 8,
+  },
+
+  optionButtonActive: {
+    borderColor: theme.colors.primary,
+    backgroundColor: "#F3F6EC",
+  },
+
+  personImage: {
+    width: 50,
+    height: 50,
+    resizeMode: "contain",
+    marginBottom: 0,
+  },
+
+  optionLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: theme.colors.textPrimary,
+  },
+
+  optionLabelActive: {
+    color: theme.colors.primary,
   },
 });

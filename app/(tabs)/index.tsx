@@ -1,5 +1,16 @@
 import { ThemedText } from "@/components/themed-text";
-import React, { useEffect, useState } from "react";
+import {
+  BookOpen,
+  Dices,
+  Flower2,
+  Image,
+  Lightbulb,
+  Moon,
+  NotebookPen,
+  Pencil,
+  Plus,
+} from "@sketchyicons/react-native";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -7,7 +18,6 @@ import {
   ScrollView,
   StatusBar,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -17,6 +27,7 @@ import { BucketItem, NewBucketItem, supabase } from "../../lib/supabase";
 import DreamModal from "../components/DreamModal";
 import GoalItem from "../components/GoalItem";
 import MemoryModal, { MemoryValues } from "../components/MemoryModal";
+import MemoryViewer from "../components/MemoryViewer";
 import { GridPaper, StickerLayer } from "../components/PaperDecor";
 import Polaroid from "../components/Polaroid";
 import TopBar, { MenuItem } from "../components/TopBar";
@@ -29,12 +40,15 @@ const bucketOf = (g: BucketItem): Bucket =>
   g.period === "year" || g.period === "someday" ? "someday" : "soon";
 
 const MENU_ITEMS: MenuItem[] = [
-  { id: "dreams", label: "Our dreams", emoji: "📖" },
-  { id: "games", label: "Games", emoji: "🎲", comingSoon: true },
-  { id: "ideas", label: "Idea box", emoji: "💡", comingSoon: true },
+  { id: "dreams", label: "Our dreams", icon: BookOpen },
+  { id: "games", label: "Games", icon: Dices, comingSoon: true },
+  { id: "ideas", label: "Idea box", icon: Lightbulb, comingSoon: true },
 ];
 
 const HOLES = 8;
+
+// iOS needs a beat between two modals; web/android don't
+const modalDelay = Platform.OS === "ios" ? 350 : 0;
 
 export default function Index() {
   const [goals, setGoals] = useState<BucketItem[]>([]);
@@ -51,6 +65,11 @@ export default function Index() {
     mode: "complete" | "edit";
     goal: BucketItem | null;
   }>({ open: false, mode: "complete", goal: null });
+
+  // which memory's scrapbook page is open
+  const [viewerId, setViewerId] = useState<string | null>(null);
+  // when editing from the scrapbook page, come back to it afterwards
+  const returnToViewer = useRef<string | null>(null);
 
   useEffect(() => {
     loadGoals();
@@ -151,22 +170,30 @@ export default function Index() {
     }
   };
 
-  const moveBackToDreams = async (goal: BucketItem) => {
-    try {
-      await patchGoal(goal.id, { completed: false, completed_at: null });
-      setMemoryModal((m) => ({ ...m, open: false }));
-      setPageTab("dreams");
-    } catch (error) {
-      console.error("Error moving back:", error);
-      Alert.alert("Error", "Failed to update item");
-    }
-  };
-
   const openDream = (goal: BucketItem) => setDreamModal({ open: true, goal });
   const openComplete = (goal: BucketItem) =>
     setMemoryModal({ open: true, mode: "complete", goal });
-  const openMemory = (goal: BucketItem) =>
+  const openMemoryEditor = (goal: BucketItem) =>
     setMemoryModal({ open: true, mode: "edit", goal });
+
+  // scrapbook page -> edit sheet
+  const editFromViewer = () => {
+    const goal = goals.find((g) => g.id === viewerId);
+    if (!goal) return;
+    returnToViewer.current = goal.id;
+    setViewerId(null);
+    setTimeout(() => openMemoryEditor(goal), modalDelay);
+  };
+
+  // edit sheet closed (saved or cancelled) -> go back to the scrapbook page
+  const closeMemoryModal = () => {
+    setMemoryModal((m) => ({ ...m, open: false }));
+    const id = returnToViewer.current;
+    returnToViewer.current = null;
+    if (id) setTimeout(() => setViewerId(id), modalDelay);
+  };
+
+  const viewerGoal = goals.find((g) => g.id === viewerId) ?? null;
 
   const activeGoals = goals.filter((g) => !g.completed);
   const memories = goals
@@ -190,10 +217,15 @@ export default function Index() {
     );
   }
 
-  const renderDreamSection = (title: string, items: BucketItem[]) =>
+  const renderDreamSection = (
+    title: string,
+    Icon: typeof Flower2,
+    items: BucketItem[],
+  ) =>
     items.length > 0 && (
       <View>
         <View style={styles.sectionHeader}>
+          <Icon size={22} color={theme.colors.textPrimary} />
           <ThemedText style={styles.sectionTitle}>{title}</ThemedText>
         </View>
         {items.map((goal) => (
@@ -223,26 +255,42 @@ export default function Index() {
             onPress={() => setPageTab("dreams")}
             style={[styles.tab, pageTab === "dreams" && styles.tabActive]}
           >
+            <NotebookPen
+              size={18}
+              color={
+                pageTab === "dreams"
+                  ? theme.colors.textPrimary
+                  : theme.colors.textSecondary
+              }
+            />
             <ThemedText
               style={[
                 styles.tabText,
                 pageTab === "dreams" && styles.tabTextActive,
               ]}
             >
-              📝 Dreams {activeGoals.length}
+              Dreams {activeGoals.length}
             </ThemedText>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setPageTab("memories")}
             style={[styles.tab, pageTab === "memories" && styles.tabActive]}
           >
+            <Image
+              size={18}
+              color={
+                pageTab === "memories"
+                  ? theme.colors.textPrimary
+                  : theme.colors.textSecondary
+              }
+            />
             <ThemedText
               style={[
                 styles.tabText,
                 pageTab === "memories" && styles.tabTextActive,
               ]}
             >
-              📸 Memories {memories.length}
+              Memories {memories.length}
             </ThemedText>
           </TouchableOpacity>
         </View>
@@ -268,13 +316,18 @@ export default function Index() {
               {activeGoals.length === 0 && (
                 <View style={styles.emptyState}>
                   <ThemedText style={styles.emptyText}>
-                    nothing written yet...{"\n"}tap + to add our first dream ✏️
+                    nothing written yet...{"\n"}tap + to add our first dream
                   </ThemedText>
+                  <Pencil
+                    size={28}
+                    color={theme.colors.textSecondary}
+                    style={styles.emptyIcon}
+                  />
                 </View>
               )}
 
-              {renderDreamSection("🌷 Soon", soonGoals)}
-              {renderDreamSection("🌙 Someday", somedayGoals)}
+              {renderDreamSection("Soon", Flower2, soonGoals)}
+              {renderDreamSection("Someday", Moon, somedayGoals)}
 
               {activeGoals.length > 0 && (
                 <ThemedText style={styles.hint}>
@@ -290,8 +343,13 @@ export default function Index() {
               {memories.length === 0 ? (
                 <View style={styles.emptyState}>
                   <ThemedText style={styles.emptyText}>
-                    no polaroids yet...{"\n"}finish a dream to stick one here 📸
+                    no polaroids yet...{"\n"}finish a dream to stick one here
                   </ThemedText>
+                  <Image
+                    size={28}
+                    color={theme.colors.textSecondary}
+                    style={styles.emptyIcon}
+                  />
                 </View>
               ) : (
                 <>
@@ -301,12 +359,12 @@ export default function Index() {
                         key={goal.id}
                         goal={goal}
                         index={i}
-                        onPress={openMemory}
+                        onPress={(g) => setViewerId(g.id)}
                       />
                     ))}
                   </View>
                   <ThemedText style={styles.hint}>
-                    tap a polaroid to edit
+                    tap a polaroid to open its page
                   </ThemedText>
                 </>
               )}
@@ -322,7 +380,7 @@ export default function Index() {
         style={styles.floatingButton}
         onPress={() => setDreamModal({ open: true, goal: null })}
       >
-        <Text style={styles.plusIcon}>+</Text>
+        <Plus size={30} color="white" />
       </TouchableOpacity>
 
       <DreamModal
@@ -337,24 +395,26 @@ export default function Index() {
         onComplete={() => {
           const goal = dreamModal.goal;
           setDreamModal((m) => ({ ...m, open: false }));
-          if (goal) {
-            // iOS needs a beat between two sheets; web/android don't
-            setTimeout(
-              () => openComplete(goal),
-              Platform.OS === "ios" ? 350 : 0,
-            );
-          }
+          if (goal) setTimeout(() => openComplete(goal), modalDelay);
         }}
+      />
+
+      <MemoryViewer
+        visible={!!viewerGoal}
+        goal={viewerGoal}
+        onClose={() => setViewerId(null)}
+        onEdit={editFromViewer}
       />
 
       <MemoryModal
         visible={memoryModal.open}
         mode={memoryModal.mode}
         goal={memoryModal.goal}
-        onClose={() => setMemoryModal((m) => ({ ...m, open: false }))}
+        onClose={closeMemoryModal}
         onSave={saveMemory}
-        onUndo={() => memoryModal.goal && moveBackToDreams(memoryModal.goal)}
         onDelete={() => {
+          // torn out: don't go back to its (now empty) scrapbook page
+          returnToViewer.current = null;
           if (memoryModal.goal) deleteGoal(memoryModal.goal.id);
           setMemoryModal((m) => ({ ...m, open: false }));
         }}
@@ -390,6 +450,9 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   tab: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     paddingHorizontal: 16,
     paddingVertical: 9,
     borderTopLeftRadius: 14,
@@ -460,7 +523,9 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     height: ROW_HEIGHT,
-    justifyContent: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   sectionTitle: {
     fontFamily: "IndieFlower",
@@ -489,6 +554,9 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     textAlign: "center",
   },
+  emptyIcon: {
+    marginTop: 10,
+  },
   floatingButton: {
     position: "absolute",
     right: 28,
@@ -504,11 +572,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
-  },
-  plusIcon: {
-    fontSize: 32,
-    color: "white",
-    fontWeight: "300",
-    marginTop: -2,
   },
 });

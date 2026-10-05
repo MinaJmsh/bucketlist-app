@@ -1,11 +1,12 @@
 import { ThemedText } from "@/components/themed-text";
+import { Menu } from "@sketchyicons/react-native";
+import type { ComponentType } from "react";
 import React, { useState } from "react";
 import {
   Alert,
   Modal,
   Pressable,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -14,7 +15,7 @@ import { theme } from "../../config/theme";
 export interface MenuItem {
   id: string;
   label: string;
-  emoji: string;
+  icon: ComponentType<{ size?: number; color?: string }>;
   onPress?: () => void;
   comingSoon?: boolean;
 }
@@ -32,7 +33,7 @@ export default function TopBar({ title, items, activeId }: TopBarProps) {
     setOpen(false);
     if (item.comingSoon) {
       setTimeout(
-        () => Alert.alert("Coming soon 💌", `${item.label} is on its way!`),
+        () => Alert.alert("Coming soon", `${item.label} is on its way!`),
         250,
       );
       return;
@@ -47,7 +48,7 @@ export default function TopBar({ title, items, activeId }: TopBarProps) {
         onPress={() => setOpen(true)}
         accessibilityLabel="Open menu"
       >
-        <Text style={styles.iconText}>🌸</Text>
+        <Menu size={30} color={theme.colors.textPrimary} />
       </TouchableOpacity>
 
       <ThemedText style={styles.title} numberOfLines={1} adjustsFontSizeToFit>
@@ -65,29 +66,35 @@ export default function TopBar({ title, items, activeId }: TopBarProps) {
       >
         <Pressable style={styles.overlay} onPress={() => setOpen(false)}>
           <View style={styles.menu}>
-            {items.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={[
-                  styles.menuItem,
-                  item.id === activeId && styles.menuItemActive,
-                ]}
-                onPress={() => handleItem(item)}
-              >
-                <Text style={styles.menuEmoji}>{item.emoji}</Text>
-                <ThemedText
-                  style={[
-                    styles.menuLabel,
-                    item.id === activeId && styles.menuLabelActive,
-                  ]}
+            {items.map((item) => {
+              const Icon = item.icon;
+              const isActive = item.id === activeId;
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[styles.menuItem, isActive && styles.menuItemActive]}
+                  onPress={() => handleItem(item)}
                 >
-                  {item.label}
-                </ThemedText>
-                {item.comingSoon && (
-                  <ThemedText style={styles.soonTag}>soon</ThemedText>
-                )}
-              </TouchableOpacity>
-            ))}
+                  <Icon
+                    size={22}
+                    color={
+                      isActive ? theme.colors.primary : theme.colors.textPrimary
+                    }
+                  />
+                  <ThemedText
+                    style={[
+                      styles.menuLabel,
+                      isActive && styles.menuLabelActive,
+                    ]}
+                  >
+                    {item.label}
+                  </ThemedText>
+                  {item.comingSoon && (
+                    <ThemedText style={styles.soonTag}>soon</ThemedText>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </Pressable>
       </Modal>
@@ -111,9 +118,6 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: "center",
     justifyContent: "center",
-  },
-  iconText: {
-    fontSize: 24,
   },
   title: {
     flex: 1,
@@ -145,9 +149,6 @@ const styles = StyleSheet.create({
   },
   menuItemActive: {
     backgroundColor: theme.colors.background,
-  },
-  menuEmoji: {
-    fontSize: 20,
   },
   menuLabel: {
     flex: 1,

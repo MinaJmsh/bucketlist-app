@@ -1,4 +1,5 @@
 import { ThemedText } from "@/components/themed-text";
+import { Scissors } from "@sketchyicons/react-native";
 import React from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { PAPER } from "../../config/paper";
@@ -30,7 +31,11 @@ export default function ConfirmDialog({
     <View style={styles.backdrop}>
       <View style={styles.card}>
         <View style={styles.tape} />
-        <ThemedText style={styles.emoji}>✂️</ThemedText>
+        <Scissors
+          size={32}
+          color={theme.colors.textPrimary}
+          style={{ marginBottom: 4 }}
+        />
         <ThemedText style={styles.title}>{title}</ThemedText>
         <ThemedText style={styles.message}>{message}</ThemedText>
 
@@ -102,29 +107,39 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 18,
   },
+
   buttons: {
+    width: "100%",
     flexDirection: "row",
     gap: 12,
   },
+
   button: {
     flex: 1,
-    paddingVertical: 12,
+    height: 52,
     borderRadius: 14,
     alignItems: "center",
+    justifyContent: "center",
   },
+
   cancelButton: {
     backgroundColor: "white",
     borderWidth: 2.5,
     borderColor: theme.colors.border,
   },
+
   cancelText: {
     color: theme.colors.textPrimary,
     fontWeight: "600",
     fontSize: 16,
   },
+
   confirmButton: {
     backgroundColor: "#D9534F",
+    borderWidth: 2.5,
+    borderColor: "#D9534F",
   },
+
   confirmText: {
     color: "white",
     fontWeight: "600",

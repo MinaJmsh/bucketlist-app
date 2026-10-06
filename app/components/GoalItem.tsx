@@ -1,6 +1,7 @@
 import { ThemedText } from "@/components/themed-text";
 import React from "react";
 import { Image, StyleSheet, TouchableOpacity } from "react-native";
+import { getCategoryIcon } from "../../config/categories";
 import { ROW_HEIGHT, RULE_LINE } from "../../config/paper";
 import { theme } from "../../config/theme";
 import { BucketItem } from "../../lib/supabase";
@@ -12,6 +13,8 @@ interface GoalItemProps {
 }
 
 export default function GoalItem({ goal, onOpen, onComplete }: GoalItemProps) {
+  const CategoryIcon = getCategoryIcon(goal.category);
+
   return (
     <TouchableOpacity
       activeOpacity={0.7}
@@ -24,12 +27,11 @@ export default function GoalItem({ goal, onOpen, onComplete }: GoalItemProps) {
         style={styles.checkbox}
       />
 
-      {/* <Text style={styles.icon}>{getCategoryIcon(goal.category)}</Text> */}
-
       <ThemedText numberOfLines={1} style={styles.title}>
         {goal.title}
       </ThemedText>
 
+      <CategoryIcon size={20} strokeWidth={1.5} />
       <Image
         source={
           goal.added_by === "A"
@@ -58,26 +60,12 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: theme.colors.border,
   },
-  icon: {
-    fontSize: 18,
-  },
   title: {
     flex: 1,
     fontFamily: "IndieFlower",
     fontSize: 21,
     color: theme.colors.textPrimary,
   },
-  // badge: {
-  //   width: 20,
-  //   height: 20,
-  //   borderRadius: 10,
-  //   alignItems: "center",
-  //   justifyContent: "center",
-  // },
-  // badgeText: {
-  //   fontSize: 10,
-  //   fontWeight: "600",
-  //   color: "white",
   personImage: {
     width: 28,
     height: 28,

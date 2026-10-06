@@ -29,6 +29,7 @@ export interface BucketItem {
   created_at: string;
   completed_at: string | null;
   updated_at: string;
+  rating?: number | null;
 }
 
 export interface NewBucketItem {

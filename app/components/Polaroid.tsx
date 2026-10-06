@@ -3,6 +3,7 @@ import { Image } from "expo-image";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { getCategoryColor, getCategoryIcon } from "../../config/categories";
+import { getRating } from "../../config/ratings";
 import { theme } from "../../config/theme";
 import { BucketItem } from "../../lib/supabase";
 
@@ -27,7 +28,9 @@ export default function Polaroid({ goal, index, onPress }: PolaroidProps) {
   const tilt = TILTS[index % TILTS.length];
   const photos = goal.photos ?? [];
   const color = getCategoryColor(goal.category);
-  const icon = getCategoryIcon(goal.category);
+  // const icon = getCategoryIcon(goal.category);
+  const CategoryIcon = getCategoryIcon(goal.category);
+  const rating = getRating(goal.rating);
 
   return (
     <TouchableOpacity
@@ -52,16 +55,19 @@ export default function Polaroid({ goal, index, onPress }: PolaroidProps) {
         </View>
       ) : (
         <View style={[styles.photoBox, { backgroundColor: color + "40" }]}>
-          <Text style={styles.icon}>{icon}</Text>
+          <CategoryIcon size={44} color={color} />{" "}
         </View>
       )}
 
       <ThemedText style={styles.caption} numberOfLines={2}>
         {goal.title}
       </ThemedText>
-      <ThemedText style={styles.date}>
-        {formatDate(goal.completed_at)}
-      </ThemedText>
+      <View style={styles.dateRow}>
+        {rating && <rating.Icon size={14} color={rating.color} />}
+        <ThemedText style={styles.date}>
+          {formatDate(goal.completed_at)}
+        </ThemedText>
+      </View>
     </TouchableOpacity>
   );
 }
@@ -126,10 +132,22 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: theme.colors.textPrimary,
   },
+  // date: {
+  //   fontSize: 11,
+  //   textAlign: "center",
+  //   color: theme.colors.textSecondary,
+  //   marginTop: 4,
+  // },
+  dateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    marginTop: 4,
+  },
   date: {
     fontSize: 11,
     textAlign: "center",
     color: theme.colors.textSecondary,
-    marginTop: 4,
   },
 });

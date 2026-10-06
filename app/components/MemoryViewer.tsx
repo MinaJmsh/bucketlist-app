@@ -14,12 +14,12 @@ import {
   Modal,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
 import { getCategoryColor, getCategoryIcon } from "../../config/categories";
 import { PAPER } from "../../config/paper";
+import { getRating } from "../../config/ratings";
 import { theme } from "../../config/theme";
 import { BucketItem } from "../../lib/supabase";
 import { GridPaper, StickerLayer } from "./PaperDecor";
@@ -59,7 +59,8 @@ export default function MemoryViewer({
 
   const photos = goal.photos ?? [];
   const color = getCategoryColor(goal.category);
-  const icon = getCategoryIcon(goal.category);
+  // const icon = getCategoryIcon(goal.category);
+  const CategoryIcon = getCategoryIcon(goal.category);
   const days =
     goal.completed_at && goal.created_at
       ? daysBetween(goal.created_at, goal.completed_at)
@@ -67,6 +68,7 @@ export default function MemoryViewer({
   const writer =
     goal.added_by === "A" ? "mina" : goal.added_by === "B" ? "parsa" : "";
   const DaysIcon = days >= 1 ? Hourglass : Zap;
+  const rating = getRating(goal.rating);
 
   return (
     <Modal
@@ -142,6 +144,20 @@ export default function MemoryViewer({
                     : "done the same day!"}
                 </ThemedText>
               </View>
+              {rating && (
+                <View
+                  style={[
+                    styles.tag,
+                    {
+                      backgroundColor: rating.color + "33",
+                      transform: [{ rotate: "1.5deg" }],
+                    },
+                  ]}
+                >
+                  <rating.Icon size={14} color={rating.color} />
+                  <ThemedText style={styles.tagText}>{rating.label}</ThemedText>
+                </View>
+              )}
             </View>
 
             {/* polaroids */}
@@ -187,7 +203,7 @@ export default function MemoryViewer({
                       { backgroundColor: color + "40" },
                     ]}
                   >
-                    <Text style={styles.noPhotoIcon}>{icon}</Text>
+                    <CategoryIcon size={60} color={color} />{" "}
                   </View>
                   <ThemedText style={styles.photoCaption}>
                     {goal.title}

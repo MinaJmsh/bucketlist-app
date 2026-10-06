@@ -16,12 +16,12 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { quickCategories } from "../../config/categories";
+import { RULE_LINE } from "../../config/paper";
 import { theme } from "../../config/theme";
 import { BucketItem, NewBucketItem } from "../../lib/supabase";
 import ConfirmDialog from "./ConfirmDialog";
@@ -40,6 +40,41 @@ interface DreamModalProps {
   onSave: (values: NewBucketItem) => void;
   onDelete?: () => void;
   onComplete?: () => void;
+}
+
+function Sticker({
+  selected,
+  tilt,
+  onPress,
+  style,
+  children,
+}: {
+  selected: boolean;
+  tilt: number;
+  onPress: () => void;
+  style?: object;
+  children: React.ReactNode;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.8}
+      style={[
+        styles.sticker,
+        style,
+        {
+          opacity: selected ? 1 : 0.65,
+          transform: [
+            { rotate: `${selected ? tilt * 1.5 : tilt}deg` },
+            { scale: selected ? 1.06 : 1 },
+          ],
+        },
+      ]}
+    >
+      {selected && <View style={styles.stickerTape} />}
+      {children}
+    </TouchableOpacity>
+  );
 }
 
 export default function DreamModal({
@@ -119,9 +154,11 @@ export default function DreamModal({
             </View>
           </View>
 
+          {/* Form: scrolls if needed */}
           <ScrollView
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
+            style={styles.formScroll}
           >
             <TextInput
               value={title}
@@ -131,28 +168,25 @@ export default function DreamModal({
               style={styles.input}
               autoFocus={!editing}
             />
-            <ThemedText style={styles.label}>When?</ThemedText>
 
+            <ThemedText style={styles.label}>When?</ThemedText>
             <View style={styles.optionsRow}>
-              {PERIODS.map((p) => (
-                <TouchableOpacity
+              {PERIODS.map((p, i) => (
+                <Sticker
                   key={p.key}
+                  selected={period === p.key}
+                  tilt={i % 2 === 0 ? -2 : 2}
                   onPress={() => setPeriod(p.key)}
-                  style={[
-                    styles.optionButton,
-                    period === p.key && styles.optionButtonActive,
-                  ]}
-                  activeOpacity={0.8}
+                  style={styles.optionSticker}
                 >
                   <p.Icon
-                    size={28}
+                    size={26}
                     color={
                       period === p.key
                         ? theme.colors.primary
                         : theme.colors.textPrimary
                     }
                   />
-
                   <ThemedText
                     style={[
                       styles.optionLabel,
@@ -161,12 +195,11 @@ export default function DreamModal({
                   >
                     {p.label}
                   </ThemedText>
-                </TouchableOpacity>
+                </Sticker>
               ))}
             </View>
 
             <ThemedText style={styles.label}>Written by</ThemedText>
-
             <View style={styles.optionsRow}>
               {[
                 {
@@ -179,18 +212,15 @@ export default function DreamModal({
                   label: "parsa",
                   image: require("../../assets/images/parsa2.png"),
                 },
-              ].map((who) => (
-                <TouchableOpacity
+              ].map((who, i) => (
+                <Sticker
                   key={who.key}
+                  selected={addedBy === who.key}
+                  tilt={i % 2 === 0 ? 2 : -2}
                   onPress={() => setAddedBy(who.key)}
-                  style={[
-                    styles.optionButton,
-                    addedBy === who.key && styles.optionButtonActive,
-                  ]}
-                  activeOpacity={0.8}
+                  style={styles.polaroidSticker}
                 >
                   <Image source={who.image} style={styles.personImage} />
-
                   <ThemedText
                     style={[
                       styles.optionLabel,
@@ -199,7 +229,7 @@ export default function DreamModal({
                   >
                     {who.label}
                   </ThemedText>
-                </TouchableOpacity>
+                </Sticker>
               ))}
             </View>
 
@@ -208,34 +238,39 @@ export default function DreamModal({
               horizontal
               showsHorizontalScrollIndicator={false}
               style={styles.categoriesScroll}
+              contentContainerStyle={styles.categories}
             >
-              <View style={styles.categories}>
-                {quickCategories.map((cat) => (
-                  <TouchableOpacity
-                    key={cat.id}
-                    onPress={() => setCategory(cat.id)}
+              {quickCategories.map((cat, i) => (
+                <Sticker
+                  key={cat.id}
+                  selected={category === cat.id}
+                  tilt={[-3, 2, -2, 3][i % 4]}
+                  onPress={() => setCategory(cat.id)}
+                  style={styles.categorySticker}
+                >
+                  <cat.icon
+                    size={24}
+                    color={
+                      category === cat.id
+                        ? theme.colors.primary
+                        : theme.colors.textPrimary
+                    }
+                  />
+                  <ThemedText
                     style={[
-                      styles.categoryButton,
-                      category === cat.id && styles.categoryButtonActive,
+                      styles.categoryText,
+                      category === cat.id && styles.categoryTextActive,
                     ]}
-                    activeOpacity={0.8}
                   >
-                    <Text style={styles.categoryIcon}>{cat.icon}</Text>
-
-                    <ThemedText
-                      style={[
-                        styles.categoryText,
-                        category === cat.id && styles.categoryTextActive,
-                      ]}
-                    >
-                      {cat.name}
-                    </ThemedText>
-                  </TouchableOpacity>
-                ))}
-              </View>
+                    {cat.name}
+                  </ThemedText>
+                </Sticker>
+              ))}
             </ScrollView>
+          </ScrollView>
 
-            {/* Footer */}
+          {/* Footer: always visible */}
+          <View style={styles.footer}>
             <TouchableOpacity
               onPress={handleSave}
               style={[styles.primaryButton, !title.trim() && { opacity: 0.5 }]}
@@ -255,7 +290,7 @@ export default function DreamModal({
                 <ThemedText style={styles.secondaryText}>We did it!</ThemedText>
               </TouchableOpacity>
             )}
-          </ScrollView>
+          </View>
         </View>
 
         <ConfirmDialog
@@ -283,8 +318,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFBEF",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    padding: theme.spacing.xl,
-    paddingBottom: 36,
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.lg,
+    paddingBottom: 24,
     maxHeight: "92%",
     borderWidth: 2.5,
     borderBottomWidth: 0,
@@ -294,7 +330,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
   },
   headingBox: {
     flex: 1,
@@ -322,61 +358,112 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+
+  // form
+  formScroll: {
+    flexShrink: 1,
+  },
   input: {
-    borderRadius: 16,
-    backgroundColor: "white",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
+    backgroundColor: "transparent",
+    borderBottomWidth: 2,
+    borderBottomColor: RULE_LINE,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    fontFamily: "IndieFlower",
+    fontSize: 22,
     color: theme.colors.textPrimary,
     marginBottom: theme.spacing.md,
   },
   label: {
-    fontSize: 16,
-    fontWeight: "600",
+    fontFamily: "IndieFlower",
+    fontSize: 20,
     color: theme.colors.textSecondary,
-    marginBottom: theme.spacing.sm,
+    marginBottom: 12,
   },
-
+  optionsRow: {
+    flexDirection: "row",
+    gap: 14,
+    width: "100%",
+    paddingTop: 8,
+    paddingHorizontal: 4,
+    marginBottom: theme.spacing.md,
+  },
   categoriesScroll: {
-    marginBottom: theme.spacing.lg,
+    marginBottom: theme.spacing.sm,
   },
   categories: {
     flexDirection: "row",
-    gap: 8,
+    gap: 12,
+    paddingTop: 10,
+    paddingBottom: 8,
+    paddingHorizontal: 6,
   },
-  categoryButton: {
-    width: 88,
-    height: 88,
-    borderRadius: 16,
-    backgroundColor: "white",
-    borderWidth: 2.5,
-    borderColor: "transparent",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 8,
-  },
-
-  categoryButtonActive: {
-    borderColor: theme.colors.primary,
-    backgroundColor: "#F3F6EC",
-  },
-
-  categoryIcon: {
-    fontSize: 28,
-    marginBottom: 2,
-  },
-
-  categoryText: {
+  optionLabel: {
+    fontFamily: "IndieFlower",
+    fontSize: 18,
     color: theme.colors.textPrimary,
-    fontSize: 14,
-    fontWeight: "600",
   },
-
+  optionLabelActive: {
+    color: theme.colors.primary,
+  },
+  categoryText: {
+    fontFamily: "IndieFlower",
+    fontSize: 16,
+    color: theme.colors.textPrimary,
+    marginTop: 2,
+  },
   categoryTextActive: {
     color: theme.colors.primary,
   },
+  personImage: {
+    width: 44,
+    height: 44,
+    resizeMode: "contain",
+  },
 
+  // sticker look
+  sticker: {
+    backgroundColor: "white",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.14,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  stickerTape: {
+    position: "absolute",
+    top: -9,
+    alignSelf: "center",
+    width: 44,
+    height: 16,
+    backgroundColor: theme.colors.accent + "99",
+    borderRadius: 3,
+    transform: [{ rotate: "-2deg" }],
+    zIndex: 2,
+  },
+  optionSticker: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 4,
+  },
+  polaroidSticker: {
+    flex: 1,
+    padding: 6,
+    paddingBottom: 8,
+    borderRadius: 2,
+  },
+  categorySticker: {
+    width: 84,
+    paddingVertical: 8,
+    borderRadius: 18,
+  },
+
+  // footer
+  footer: {
+    paddingTop: 10,
+  },
   primaryButton: {
     paddingVertical: 15,
     borderRadius: 16,
@@ -404,54 +491,5 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
     fontWeight: "600",
     fontSize: 17,
-  },
-  peopleRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: theme.spacing.md,
-  },
-
-  personLabelActive: {
-    color: theme.colors.primary,
-  },
-  optionsRow: {
-    flexDirection: "row",
-    gap: 12,
-    width: "100%",
-    marginBottom: theme.spacing.md,
-  },
-
-  optionButton: {
-    flex: 1,
-    height: 88,
-    borderRadius: 16,
-    backgroundColor: "white",
-    borderWidth: 2.5,
-    borderColor: "transparent",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 8,
-  },
-
-  optionButtonActive: {
-    borderColor: theme.colors.primary,
-    backgroundColor: "#F3F6EC",
-  },
-
-  personImage: {
-    width: 50,
-    height: 50,
-    resizeMode: "contain",
-    marginBottom: 0,
-  },
-
-  optionLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: theme.colors.textPrimary,
-  },
-
-  optionLabelActive: {
-    color: theme.colors.primary,
   },
 });

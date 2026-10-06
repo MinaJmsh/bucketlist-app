@@ -5,6 +5,7 @@ import {
   Flower2,
   Image,
   Lightbulb,
+  Menu,
   Moon,
   NotebookPen,
   Pencil,
@@ -14,6 +15,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Platform,
   ScrollView,
   StatusBar,
@@ -30,7 +32,8 @@ import MemoryModal, { MemoryValues } from "../components/MemoryModal";
 import MemoryViewer from "../components/MemoryViewer";
 import { GridPaper, StickerLayer } from "../components/PaperDecor";
 import Polaroid from "../components/Polaroid";
-import TopBar, { MenuItem } from "../components/TopBar";
+import SideMenu, { MenuItem } from "../components/SideMenu";
+import WobblyBox from "../components/ui/WobblyBox";
 
 type Bucket = "soon" | "someday";
 type PageTab = "dreams" | "memories";
@@ -46,14 +49,50 @@ const MENU_ITEMS: MenuItem[] = [
 ];
 
 const HOLES = 8;
+const BORDER_WIDTH = 2.5;
 
 // iOS needs a beat between two modals; web/android don't
 const modalDelay = Platform.OS === "ios" ? 350 : 0;
+
+// Tab that springs up in size when it becomes active
+function TabButton({
+  active,
+  onPress,
+  children,
+}: {
+  active: boolean;
+  onPress: () => void;
+  children: React.ReactNode;
+}) {
+  const scale = useRef(new Animated.Value(active ? 1.06 : 1)).current;
+
+  useEffect(() => {
+    Animated.spring(scale, {
+      toValue: active ? 1.06 : 1,
+      friction: 5,
+      tension: 140,
+      useNativeDriver: true,
+    }).start();
+  }, [active]);
+
+  return (
+    <Animated.View style={{ transform: [{ scale }], zIndex: active ? 2 : 1 }}>
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={onPress}
+        style={[styles.tab, active && styles.tabActive]}
+      >
+        {children}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
 
 export default function Index() {
   const [goals, setGoals] = useState<BucketItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [pageTab, setPageTab] = useState<PageTab>("dreams");
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const [dreamModal, setDreamModal] = useState<{
     open: boolean;
@@ -246,14 +285,19 @@ export default function Index() {
         backgroundColor={theme.colors.background}
       />
 
-      <TopBar title="MAP BUCKETLIST" items={MENU_ITEMS} activeId="dreams" />
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => setMenuOpen(true)} hitSlop={12}>
+          <Menu size={30} color={theme.colors.textPrimary} />
+        </TouchableOpacity>
+        <ThemedText style={styles.headerTitle}>MAP BUCKETLIST</ThemedText>
+      </View>
 
       <View style={styles.notebook}>
         {/* Folder tabs sticking out of the page */}
         <View style={styles.tabRow}>
-          <TouchableOpacity
+          <TabButton
+            active={pageTab === "dreams"}
             onPress={() => setPageTab("dreams")}
-            style={[styles.tab, pageTab === "dreams" && styles.tabActive]}
           >
             <NotebookPen
               size={18}
@@ -271,10 +315,11 @@ export default function Index() {
             >
               Dreams {activeGoals.length}
             </ThemedText>
-          </TouchableOpacity>
-          <TouchableOpacity
+          </TabButton>
+
+          <TabButton
+            active={pageTab === "memories"}
             onPress={() => setPageTab("memories")}
-            style={[styles.tab, pageTab === "memories" && styles.tabActive]}
           >
             <Image
               size={18}
@@ -292,88 +337,96 @@ export default function Index() {
             >
               Memories {memories.length}
             </ThemedText>
-          </TouchableOpacity>
+          </TabButton>
         </View>
 
         {/* The page */}
-        <View style={styles.page}>
-          {pageTab === "memories" ? (
-            <GridPaper />
-          ) : (
-            <View style={styles.marginLine} pointerEvents="none" />
-          )}
-          <View style={styles.holes} pointerEvents="none">
-            {Array.from({ length: HOLES }).map((_, i) => (
-              <View key={i} style={styles.hole} />
-            ))}
-          </View>
+        <WobblyBox
+          style={styles.page}
+          fill={PAPER}
+          stroke={theme.colors.border}
+          strokeWidth={BORDER_WIDTH}
+          seed={33}
+        >
+          <View style={styles.pageClip}>
+            {pageTab === "memories" ? (
+              <GridPaper />
+            ) : (
+              <View style={styles.marginLine} pointerEvents="none" />
+            )}
+            <View style={styles.holes} pointerEvents="none">
+              {Array.from({ length: HOLES }).map((_, i) => (
+                <View key={i} style={styles.hole} />
+              ))}
+            </View>
 
-          {pageTab === "dreams" ? (
-            <ScrollView
-              contentContainerStyle={styles.dreamsContent}
-              showsVerticalScrollIndicator={false}
-            >
-              {activeGoals.length === 0 && (
-                <View style={styles.emptyState}>
-                  <ThemedText style={styles.emptyText}>
-                    nothing written yet...{"\n"}tap + to add our first dream
-                  </ThemedText>
-                  <Pencil
-                    size={28}
-                    color={theme.colors.textSecondary}
-                    style={styles.emptyIcon}
-                  />
-                </View>
-              )}
-
-              {renderDreamSection("Soon", Flower2, soonGoals)}
-              {renderDreamSection("Someday", Moon, somedayGoals)}
-
-              {activeGoals.length > 0 && (
-                <ThemedText style={styles.hint}>
-                  tap a line to edit · tap the circle when we've done it
-                </ThemedText>
-              )}
-            </ScrollView>
-          ) : (
-            <ScrollView
-              contentContainerStyle={styles.memoriesContent}
-              showsVerticalScrollIndicator={false}
-            >
-              {memories.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <ThemedText style={styles.emptyText}>
-                    no polaroids yet...{"\n"}finish a dream to stick one here
-                  </ThemedText>
-                  <Image
-                    size={28}
-                    color={theme.colors.textSecondary}
-                    style={styles.emptyIcon}
-                  />
-                </View>
-              ) : (
-                <>
-                  <View style={styles.polaroidGrid}>
-                    {memories.map((goal, i) => (
-                      <Polaroid
-                        key={goal.id}
-                        goal={goal}
-                        index={i}
-                        onPress={(g) => setViewerId(g.id)}
-                      />
-                    ))}
+            {pageTab === "dreams" ? (
+              <ScrollView
+                contentContainerStyle={styles.dreamsContent}
+                showsVerticalScrollIndicator={false}
+              >
+                {activeGoals.length === 0 && (
+                  <View style={styles.emptyState}>
+                    <ThemedText style={styles.emptyText}>
+                      nothing written yet...{"\n"}tap + to add our first dream
+                    </ThemedText>
+                    <Pencil
+                      size={28}
+                      color={theme.colors.textSecondary}
+                      style={styles.emptyIcon}
+                    />
                   </View>
+                )}
+
+                {renderDreamSection("Soon", Flower2, soonGoals)}
+                {renderDreamSection("Someday", Moon, somedayGoals)}
+
+                {activeGoals.length > 0 && (
                   <ThemedText style={styles.hint}>
-                    tap a polaroid to open its page
+                    tap a line to edit · tap the circle when we've done it
                   </ThemedText>
-                </>
-              )}
-              <StickerLayer
-                count={Math.max(2, Math.ceil(memories.length / 2) + 1)}
-              />
-            </ScrollView>
-          )}
-        </View>
+                )}
+              </ScrollView>
+            ) : (
+              <ScrollView
+                contentContainerStyle={styles.memoriesContent}
+                showsVerticalScrollIndicator={false}
+              >
+                {memories.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <ThemedText style={styles.emptyText}>
+                      no polaroids yet...{"\n"}finish a dream to stick one here
+                    </ThemedText>
+                    <Image
+                      size={28}
+                      color={theme.colors.textSecondary}
+                      style={styles.emptyIcon}
+                    />
+                  </View>
+                ) : (
+                  <>
+                    <View style={styles.polaroidGrid}>
+                      {memories.map((goal, i) => (
+                        <Polaroid
+                          key={goal.id}
+                          goal={goal}
+                          index={i}
+                          onPress={(g) => setViewerId(g.id)}
+                        />
+                      ))}
+                    </View>
+                    <ThemedText style={styles.hint}>
+                      tap a polaroid to open its page
+                    </ThemedText>
+                  </>
+                )}
+                <StickerLayer
+                  count={Math.max(2, Math.ceil(memories.length / 2) + 1)}
+                />
+              </ScrollView>
+            )}
+          </View>
+        </WobblyBox>
       </View>
 
       <TouchableOpacity
@@ -419,6 +472,14 @@ export default function Index() {
           setMemoryModal((m) => ({ ...m, open: false }));
         }}
       />
+
+      <SideMenu
+        visible={menuOpen}
+        items={MENU_ITEMS}
+        activeId="dreams"
+        onClose={() => setMenuOpen(false)}
+        onSelect={() => {}}
+      />
     </View>
   );
 }
@@ -437,6 +498,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: theme.colors.textSecondary,
   },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    paddingHorizontal: 20,
+    paddingTop:
+      Platform.OS === "ios" ? 64 : (StatusBar.currentHeight ?? 24) + 16,
+    paddingBottom: 40,
+  },
+  headerTitle: {
+    fontFamily: "IndieFlower",
+    fontSize: 22,
+    color: theme.colors.textPrimary,
+  },
   notebook: {
     flex: 1,
     marginHorizontal: 14,
@@ -444,9 +519,10 @@ const styles = StyleSheet.create({
   },
   tabRow: {
     flexDirection: "row",
+    alignItems: "flex-end",
     gap: 6,
     paddingLeft: 14,
-    marginBottom: -2.5,
+    marginBottom: -6, // overlaps the wobbly top line so the active tab covers it
     zIndex: 2,
   },
   tab: {
@@ -455,6 +531,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 16,
     paddingVertical: 9,
+    marginBottom: 2, // inactive tabs sit on the line
     borderTopLeftRadius: 14,
     borderTopRightRadius: 14,
     borderWidth: 2.5,
@@ -464,7 +541,8 @@ const styles = StyleSheet.create({
   tabActive: {
     backgroundColor: PAPER,
     borderBottomWidth: 0,
-    paddingBottom: 11.5,
+    marginBottom: 0, // reaches over the line so tab and page look joined
+    paddingBottom: 15,
   },
   tabText: {
     fontSize: 17,
@@ -475,13 +553,13 @@ const styles = StyleSheet.create({
   },
   page: {
     flex: 1,
-    backgroundColor: PAPER,
-    borderWidth: 2.5,
-    borderColor: theme.colors.border,
-    borderTopLeftRadius: 6,
-    borderTopRightRadius: 20,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+  },
+  pageClip: {
+    position: "absolute",
+    top: 6,
+    bottom: 6,
+    left: 6,
+    right: 6,
     overflow: "hidden",
   },
   marginLine: {

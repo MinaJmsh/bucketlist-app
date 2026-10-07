@@ -9,7 +9,7 @@ import {
   Zap,
 } from "@sketchyicons/react-native";
 import { Image } from "expo-image";
-import React from "react";
+import React, { useState } from "react";
 import {
   Modal,
   ScrollView,
@@ -23,7 +23,9 @@ import { getRating } from "../../config/ratings";
 import { theme } from "../../config/theme";
 import { pickTape } from "../../config/washi";
 import { BucketItem } from "../../lib/supabase";
+import CameraViewer from "./CameraViewer";
 import { GridPaper, StickerLayer } from "./PaperDecor";
+import WobblyBox, { WobblyCircle, WobblyLine, hashSeed } from "./ui/WobblyBox";
 
 const TILTS = [-4, 3, -2, 4, -3, 2];
 
@@ -55,6 +57,28 @@ function Tape({ tapeKey, style }: { tapeKey: string; style: object }) {
   );
 }
 
+// date / rating tags: plain highlighter-style pills
+function Tag({
+  color,
+  tilt,
+  children,
+}: {
+  color: string;
+  tilt: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <View
+      style={[
+        styles.tag,
+        { backgroundColor: color, transform: [{ rotate: `${tilt}deg` }] },
+      ]}
+    >
+      {children}
+    </View>
+  );
+}
+
 interface MemoryViewerProps {
   visible: boolean;
   goal: BucketItem | null;
@@ -68,6 +92,9 @@ export default function MemoryViewer({
   onClose,
   onEdit,
 }: MemoryViewerProps) {
+  // which photo is open in the camera view (null = camera closed)
+  const [cameraIndex, setCameraIndex] = useState<number | null>(null);
+
   if (!goal) return null;
 
   const photos = goal.photos ?? [];
@@ -81,184 +108,245 @@ export default function MemoryViewer({
     goal.added_by === "A" ? "mina" : goal.added_by === "B" ? "parsa" : "";
   const DaysIcon = days >= 1 ? Hourglass : Zap;
   const rating = getRating(goal.rating);
+  const seed = hashSeed(goal.id);
+
+  const handleClose = () => {
+    setCameraIndex(null);
+    onClose();
+  };
+
+  const handleEdit = () => {
+    setCameraIndex(null);
+    onEdit();
+  };
 
   return (
     <Modal
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={onClose}
+      // Android back button: close the camera first, then the page
+      onRequestClose={() =>
+        cameraIndex !== null ? setCameraIndex(null) : handleClose()
+      }
     >
       <View style={styles.overlay}>
-        <View style={styles.card}>
-          <GridPaper />
-
+        <WobblyBox
+          style={styles.card}
+          fill={PAPER}
+          stroke={theme.colors.border}
+          strokeWidth={2.5}
+          seed={seed}
+        >
           <TouchableOpacity
             style={styles.closeButton}
-            onPress={onClose}
+            onPress={handleClose}
             accessibilityLabel="Close"
           >
-            <X size={18} color={theme.colors.textPrimary} />
+            <WobblyCircle
+              size={38}
+              fill="white"
+              stroke={theme.colors.border}
+              seed={seed + 1}
+            >
+              <X size={18} color={theme.colors.textPrimary} />
+            </WobblyCircle>
           </TouchableOpacity>
 
-          <ScrollView
-            style={styles.scroll}
-            contentContainerStyle={styles.content}
-            showsVerticalScrollIndicator={false}
-          >
-            <Tape tapeKey={goal.id + "top"} style={styles.topTape} />
+          {/* everything that scrolls is clipped INSIDE the wobbly outline */}
+          <View style={styles.clip}>
+            <GridPaper />
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={styles.content}
+              showsVerticalScrollIndicator={false}
+            >
+              <Tape tapeKey={goal.id + "top"} style={styles.topTape} />
 
-            <ThemedText style={styles.title}>{goal.title}</ThemedText>
+              <ThemedText style={styles.title}>{goal.title}</ThemedText>
 
-            {/* date tags */}
-            <View style={styles.tagRow}>
-              <View
-                style={[
-                  styles.tag,
-                  {
-                    backgroundColor: theme.colors.accent + "55",
-                    transform: [{ rotate: "-2deg" }],
-                  },
-                ]}
-              >
-                <Sprout size={14} color={theme.colors.textPrimary} />
-                <ThemedText style={styles.tagText}>
-                  dreamed up {formatDate(goal.created_at)}
-                </ThemedText>
-              </View>
-              <View
-                style={[
-                  styles.tag,
-                  {
-                    backgroundColor: theme.colors.secondary + "55",
-                    transform: [{ rotate: "2deg" }],
-                  },
-                ]}
-              >
-                <PartyPopper size={14} color={theme.colors.textPrimary} />
-                <ThemedText style={styles.tagText}>
-                  done {formatDate(goal.completed_at)}
-                </ThemedText>
-              </View>
-              <View
-                style={[
-                  styles.tag,
-                  {
-                    backgroundColor: theme.colors.primary + "33",
-                    transform: [{ rotate: "-1deg" }],
-                  },
-                ]}
-              >
-                <DaysIcon size={14} color={theme.colors.textPrimary} />
-                <ThemedText style={styles.tagText}>
-                  {days >= 1
-                    ? `${days} ${days === 1 ? "day" : "days"} of dreaming`
-                    : "done the same day!"}
-                </ThemedText>
-              </View>
-              {rating && (
-                <View
-                  style={[
-                    styles.tag,
-                    {
-                      backgroundColor: rating.color + "33",
-                      transform: [{ rotate: "1.5deg" }],
-                    },
-                  ]}
-                >
-                  <rating.Icon size={14} color={rating.color} />
-                  <ThemedText style={styles.tagText}>{rating.label}</ThemedText>
-                </View>
-              )}
-            </View>
-
-            {/* polaroids */}
-            <View style={styles.polaroidArea}>
-              {photos.length > 0 ? (
-                photos.map((uri, i) => (
-                  <View
-                    key={uri + i}
-                    style={[
-                      styles.polaroid,
-                      photos.length === 1 && styles.polaroidSingle,
-                      {
-                        transform: [
-                          { rotate: `${TILTS[i % TILTS.length]}deg` },
-                        ],
-                      },
-                    ]}
-                  >
-                    <Tape tapeKey={goal.id + "photo" + i} style={styles.tape} />
-                    <Image
-                      source={{ uri }}
-                      style={styles.photo}
-                      contentFit="cover"
-                    />
-                    <ThemedText style={styles.photoCaption}>
-                      {i === 0 ? goal.title : ""}
+              {/* date tags */}
+              <View style={styles.tagRow}>
+                <Tag color={theme.colors.accent + "55"} tilt={-2}>
+                  <Sprout size={14} color={theme.colors.textPrimary} />
+                  <ThemedText style={styles.tagText}>
+                    dreamed up {formatDate(goal.created_at)}
+                  </ThemedText>
+                </Tag>
+                <Tag color={theme.colors.secondary + "55"} tilt={2}>
+                  <PartyPopper size={14} color={theme.colors.textPrimary} />
+                  <ThemedText style={styles.tagText}>
+                    done {formatDate(goal.completed_at)}
+                  </ThemedText>
+                </Tag>
+                <Tag color={theme.colors.primary + "33"} tilt={-1}>
+                  <DaysIcon size={14} color={theme.colors.textPrimary} />
+                  <ThemedText style={styles.tagText}>
+                    {days >= 1
+                      ? `${days} ${days === 1 ? "day" : "days"} of dreaming`
+                      : "done the same day!"}
+                  </ThemedText>
+                </Tag>
+                {rating && (
+                  <Tag color={rating.color + "33"} tilt={1.5}>
+                    <rating.Icon size={14} color={rating.color} />
+                    <ThemedText style={styles.tagText}>
+                      {rating.label}
                     </ThemedText>
-                  </View>
-                ))
-              ) : (
-                <View
-                  style={[
-                    styles.polaroid,
-                    styles.polaroidSingle,
-                    { transform: [{ rotate: "-3deg" }] },
-                  ]}
-                >
-                  <Tape tapeKey={goal.id + "photo0"} style={styles.tape} />
+                  </Tag>
+                )}
+              </View>
+
+              {/* polaroids: tap one to open it in the camera */}
+              <View style={styles.polaroidArea}>
+                {photos.length > 0 ? (
+                  photos.map((uri, i) => (
+                    <TouchableOpacity
+                      key={uri + i}
+                      activeOpacity={0.9}
+                      onPress={() => setCameraIndex(i)}
+                      style={[
+                        styles.polaroidShadow,
+                        photos.length === 1 && styles.polaroidSingle,
+                        {
+                          transform: [
+                            { rotate: `${TILTS[i % TILTS.length]}deg` },
+                          ],
+                        },
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.shadowRect,
+                          { backgroundColor: "white" },
+                        ]}
+                      />
+                      <WobblyBox
+                        style={styles.polaroid}
+                        fill="white"
+                        stroke={theme.colors.border}
+                        strokeWidth={1.5}
+                        seed={seed + 10 + i}
+                      >
+                        <Tape
+                          tapeKey={goal.id + "photo" + i}
+                          style={styles.tape}
+                        />
+                        <Image
+                          source={{ uri }}
+                          style={styles.photo}
+                          contentFit="cover"
+                        />
+                        <ThemedText style={styles.photoCaption}>
+                          {i === 0 ? goal.title : ""}
+                        </ThemedText>
+                      </WobblyBox>
+                    </TouchableOpacity>
+                  ))
+                ) : (
                   <View
                     style={[
-                      styles.photo,
-                      styles.noPhoto,
-                      { backgroundColor: color + "40" },
+                      styles.polaroidShadow,
+                      styles.polaroidSingle,
+                      { transform: [{ rotate: "-3deg" }] },
                     ]}
                   >
-                    <CategoryIcon size={60} color={color} />
+                    <View
+                      style={[styles.shadowRect, { backgroundColor: "white" }]}
+                    />
+                    <WobblyBox
+                      style={styles.polaroid}
+                      fill="white"
+                      stroke={theme.colors.border}
+                      strokeWidth={1.5}
+                      seed={seed + 10}
+                    >
+                      <Tape tapeKey={goal.id + "photo0"} style={styles.tape} />
+                      <View
+                        style={[
+                          styles.photo,
+                          styles.noPhoto,
+                          { backgroundColor: color + "40" },
+                        ]}
+                      >
+                        <CategoryIcon size={60} color={color} />
+                      </View>
+                      <ThemedText style={styles.photoCaption}>
+                        {goal.title}
+                      </ThemedText>
+                    </WobblyBox>
                   </View>
-                  <ThemedText style={styles.photoCaption}>
-                    {goal.title}
-                  </ThemedText>
-                </View>
-              )}
-            </View>
+                )}
+              </View>
 
-            {/* sticky note */}
-            <View style={styles.note}>
-              <Tape tapeKey={goal.id + "note"} style={styles.noteTape} />
-              <ThemedText style={styles.noteHeading}>
-                our little note
-              </ThemedText>
-              {goal.description ? (
-                <ThemedText style={styles.noteText}>
-                  {goal.description}
-                </ThemedText>
-              ) : (
-                <ThemedText style={[styles.noteText, styles.noteEmpty]}>
-                  nothing written yet... tap edit to add a note
-                </ThemedText>
-              )}
-              {!!writer && (
-                <View style={styles.signRow}>
-                  <ThemedText style={styles.noteSign}>
-                    — dreamed up by {writer}
+              {/* sticky note */}
+              <View style={styles.noteShadow}>
+                <View
+                  style={[styles.shadowRect, { backgroundColor: "#FFF6B8" }]}
+                />
+                <WobblyBox
+                  style={styles.note}
+                  fill="#FFF6B8"
+                  stroke="#E3D170"
+                  strokeWidth={1.5}
+                  seed={seed + 30}
+                >
+                  <Tape tapeKey={goal.id + "note"} style={styles.noteTape} />
+                  <ThemedText style={styles.noteHeading}>
+                    our little note
                   </ThemedText>
-                  <Heart size={14} color={theme.colors.textSecondary} />
-                </View>
-              )}
-            </View>
+                  {goal.description ? (
+                    <ThemedText style={styles.noteText}>
+                      {goal.description}
+                    </ThemedText>
+                  ) : (
+                    <ThemedText style={[styles.noteText, styles.noteEmpty]}>
+                      nothing written yet... tap edit to add a note
+                    </ThemedText>
+                  )}
+                  {!!writer && (
+                    <View style={styles.signRow}>
+                      <ThemedText style={styles.noteSign}>
+                        — dreamed up by {writer}
+                      </ThemedText>
+                      <Heart size={14} color={theme.colors.textSecondary} />
+                    </View>
+                  )}
+                </WobblyBox>
+              </View>
 
-            <StickerLayer count={4} seed={seedFrom(goal.id)} />
-          </ScrollView>
+              <StickerLayer count={4} seed={seedFrom(goal.id)} />
+            </ScrollView>
+          </View>
 
           <View style={styles.footer}>
-            <TouchableOpacity style={styles.editButton} onPress={onEdit}>
-              <Pencil size={18} color="white" />
-              <ThemedText style={styles.editText}>Edit this page</ThemedText>
+            <WobblyLine
+              style={styles.footerLine}
+              stroke={theme.colors.border}
+              strokeWidth={2}
+              seed={seed + 40}
+            />
+            <TouchableOpacity onPress={handleEdit} activeOpacity={0.8}>
+              <WobblyBox
+                style={styles.editButton}
+                fill={theme.colors.primary}
+                stroke={theme.colors.primary}
+                strokeWidth={2.5}
+                seed={seed + 41}
+              >
+                <Pencil size={18} color="white" />
+                <ThemedText style={styles.editText}>Edit this page</ThemedText>
+              </WobblyBox>
             </TouchableOpacity>
           </View>
-        </View>
+        </WobblyBox>
+
+        {/* camera view: last child so it sits on top of everything */}
+        <CameraViewer
+          photos={photos}
+          startIndex={cameraIndex}
+          onClose={() => setCameraIndex(null)}
+        />
       </View>
     </Modal>
   );
@@ -276,32 +364,25 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 420,
     maxHeight: "90%",
-    backgroundColor: PAPER,
-    borderRadius: 22,
-    borderWidth: 2.5,
-    borderColor: theme.colors.border,
+  },
+  // clips the grid + scrolling content to sit inside the wobbly outline
+  clip: {
+    flexShrink: 1,
+    margin: 7,
     overflow: "hidden",
   },
   closeButton: {
     position: "absolute",
-    top: 12,
-    right: 12,
+    top: 14,
+    right: 14,
     zIndex: 5,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "white",
-    borderWidth: 2,
-    borderColor: theme.colors.border,
-    alignItems: "center",
-    justifyContent: "center",
   },
   scroll: {
     flexShrink: 1,
   },
   content: {
-    paddingHorizontal: 22,
-    paddingTop: 40,
+    paddingHorizontal: 20,
+    paddingTop: 44,
     paddingBottom: 26,
   },
   // washi tape images (rotation is set per tape in <Tape />)
@@ -343,22 +424,33 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "center",
+    alignItems: "flex-start", // don't stretch shorter polaroids
     gap: 14,
     marginBottom: 26,
   },
-  polaroid: {
+  polaroidShadow: {
     width: "46%",
-    backgroundColor: "white",
-    padding: 8,
-    paddingBottom: 10,
+  },
+  polaroidSingle: {
+    width: "76%",
+  },
+  // inset rectangle that only carries the shadow; it sits fully inside the
+  // wobbly outline, so only the soft shadow shows outside the line
+  shadowRect: {
+    position: "absolute",
+    top: 5,
+    left: 5,
+    right: 5,
+    bottom: 5,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.14,
     shadowRadius: 8,
     elevation: 4,
   },
-  polaroidSingle: {
-    width: "76%",
+  polaroid: {
+    padding: 11,
+    paddingBottom: 12,
   },
   tape: {
     position: "absolute",
@@ -385,17 +477,12 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
     marginTop: 8,
   },
-  note: {
-    backgroundColor: "#FFF6B8",
-    padding: 18,
-    paddingTop: 22,
-    borderRadius: 4,
+  noteShadow: {
     transform: [{ rotate: "1deg" }],
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 3,
+  },
+  note: {
+    padding: 20,
+    paddingTop: 24,
   },
   noteTape: {
     position: "absolute",
@@ -434,20 +521,18 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
   },
   footer: {
-    padding: 14,
-    paddingTop: 10,
-    backgroundColor: PAPER,
-    borderTopWidth: 2,
-    borderTopColor: theme.colors.border,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  footerLine: {
+    marginBottom: 10,
   },
   editButton: {
-    paddingVertical: 14,
-    borderRadius: 16,
+    paddingVertical: 15,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     gap: 8,
-    backgroundColor: theme.colors.primary,
   },
   editText: {
     color: "white",

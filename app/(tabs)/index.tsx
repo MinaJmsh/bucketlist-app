@@ -94,6 +94,8 @@ export default function Index() {
   const [pageTab, setPageTab] = useState<PageTab>("dreams");
   const [menuOpen, setMenuOpen] = useState(false);
 
+  const BG = require("../../assets/images/bg1.jpg");
+
   const [dreamModal, setDreamModal] = useState<{
     open: boolean;
     goal: BucketItem | null;
@@ -614,6 +616,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
+    alignItems: "flex-start", // don't stretch shorter polaroids
   },
   hint: {
     marginTop: 16,

@@ -7,6 +7,7 @@ import { getRating } from "../../config/ratings";
 import { theme } from "../../config/theme";
 import { pickTape } from "../../config/washi";
 import { BucketItem } from "../../lib/supabase";
+import WobblyBox, { hashSeed } from "./ui/WobblyBox";
 
 const TILTS = [-3, 2, -1.5, 3, -2.5, 1.5];
 
@@ -40,6 +41,9 @@ export default function Polaroid({ goal, index, onPress }: PolaroidProps) {
       onPress={() => onPress(goal)}
       style={[styles.wrap, { transform: [{ rotate: `${tilt}deg` }] }]}
     >
+      {/* inset rectangle that only carries the shadow */}
+      <View style={[styles.shadowRect, { backgroundColor: "white" }]} />
+
       <Image
         source={tape.source}
         contentFit="contain"
@@ -47,34 +51,42 @@ export default function Polaroid({ goal, index, onPress }: PolaroidProps) {
         pointerEvents="none"
       />
 
-      {photos.length > 0 ? (
-        <View style={styles.photoBox}>
-          <Image
-            source={{ uri: photos[0] }}
-            style={styles.photo}
-            contentFit="cover"
-          />
-          {photos.length > 1 && (
-            <View style={styles.countBadge}>
-              <Text style={styles.countText}>+{photos.length - 1}</Text>
-            </View>
-          )}
-        </View>
-      ) : (
-        <View style={[styles.photoBox, { backgroundColor: color + "40" }]}>
-          <CategoryIcon size={44} color={color} />
-        </View>
-      )}
+      <WobblyBox
+        style={styles.card}
+        fill="white"
+        stroke={theme.colors.border}
+        strokeWidth={1.5}
+        seed={hashSeed(goal.id)}
+      >
+        {photos.length > 0 ? (
+          <View style={styles.photoBox}>
+            <Image
+              source={{ uri: photos[0] }}
+              style={styles.photo}
+              contentFit="cover"
+            />
+            {photos.length > 1 && (
+              <View style={styles.countBadge}>
+                <Text style={styles.countText}>+{photos.length - 1}</Text>
+              </View>
+            )}
+          </View>
+        ) : (
+          <View style={[styles.photoBox, { backgroundColor: color + "40" }]}>
+            <CategoryIcon size={44} color={color} />
+          </View>
+        )}
 
-      <ThemedText style={styles.caption} numberOfLines={2}>
-        {goal.title}
-      </ThemedText>
-      <View style={styles.dateRow}>
-        {rating && <rating.Icon size={14} color={rating.color} />}
-        <ThemedText style={styles.date}>
-          {formatDate(goal.completed_at)}
+        <ThemedText style={styles.caption} numberOfLines={2}>
+          {goal.title}
         </ThemedText>
-      </View>
+        <View style={styles.dateRow}>
+          {rating && <rating.Icon size={14} color={rating.color} />}
+          <ThemedText style={styles.date}>
+            {formatDate(goal.completed_at)}
+          </ThemedText>
+        </View>
+      </WobblyBox>
     </TouchableOpacity>
   );
 }
@@ -82,15 +94,24 @@ export default function Polaroid({ goal, index, onPress }: PolaroidProps) {
 const styles = StyleSheet.create({
   wrap: {
     width: "47%",
-    backgroundColor: "white",
-    padding: 10,
-    paddingBottom: 14,
     marginBottom: 22,
+  },
+  // sits fully inside the wobbly outline, so only the soft shadow shows outside
+  shadowRect: {
+    position: "absolute",
+    top: 5,
+    left: 5,
+    right: 5,
+    bottom: 5,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,
     shadowRadius: 8,
     elevation: 4,
+  },
+  card: {
+    padding: 12,
+    paddingBottom: 16,
   },
   tape: {
     position: "absolute",

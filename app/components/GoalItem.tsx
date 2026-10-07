@@ -5,6 +5,7 @@ import { getCategoryIcon } from "../../config/categories";
 import { ROW_HEIGHT, RULE_LINE } from "../../config/paper";
 import { theme } from "../../config/theme";
 import { BucketItem } from "../../lib/supabase";
+import { WobblyCircle, WobblyLine, hashSeed } from "./ui/WobblyBox";
 
 interface GoalItemProps {
   goal: BucketItem;
@@ -14,6 +15,7 @@ interface GoalItemProps {
 
 export default function GoalItem({ goal, onOpen, onComplete }: GoalItemProps) {
   const CategoryIcon = getCategoryIcon(goal.category);
+  const seed = hashSeed(goal.id);
 
   return (
     <TouchableOpacity
@@ -21,11 +23,14 @@ export default function GoalItem({ goal, onOpen, onComplete }: GoalItemProps) {
       onPress={() => onOpen(goal)}
       style={styles.row}
     >
-      <TouchableOpacity
-        onPress={() => onComplete(goal)}
-        hitSlop={12}
-        style={styles.checkbox}
-      />
+      <TouchableOpacity onPress={() => onComplete(goal)} hitSlop={12}>
+        <WobblyCircle
+          size={24}
+          stroke={theme.colors.border}
+          strokeWidth={2}
+          seed={seed}
+        />
+      </TouchableOpacity>
 
       <ThemedText numberOfLines={1} style={styles.title}>
         {goal.title}
@@ -40,6 +45,14 @@ export default function GoalItem({ goal, onOpen, onComplete }: GoalItemProps) {
         }
         style={styles.personImage}
       />
+
+      {/* wobbly notebook rule */}
+      <WobblyLine
+        style={styles.rule}
+        stroke={RULE_LINE}
+        strokeWidth={1.5}
+        seed={seed + 7}
+      />
     </TouchableOpacity>
   );
 }
@@ -50,15 +63,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: RULE_LINE,
   },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: theme.colors.border,
+  rule: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: -3,
   },
   title: {
     flex: 1,

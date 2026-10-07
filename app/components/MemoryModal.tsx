@@ -27,6 +27,7 @@ import { theme } from "../../config/theme";
 import { pickPhotos, uploadPhoto } from "../../lib/photos";
 import { BucketItem } from "../../lib/supabase";
 import ConfirmDialog from "./ConfirmDialog";
+import WobblyBox, { WobblyCircle, WobblyLine } from "./ui/WobblyBox";
 
 export interface MemoryValues {
   title: string;
@@ -135,7 +136,13 @@ export default function MemoryModal({
         style={styles.overlay}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <View style={styles.sheet}>
+        <WobblyBox
+          style={styles.sheet}
+          fill="#FFFBEF"
+          stroke={theme.colors.border}
+          strokeWidth={2.5}
+          seed={6}
+        >
           {/* Header: title + small icon buttons */}
           <View style={styles.headerRow}>
             <View style={styles.headingBox}>
@@ -154,20 +161,32 @@ export default function MemoryModal({
             <View style={styles.headerActions}>
               {!isComplete && (
                 <TouchableOpacity
-                  style={styles.iconButton}
                   onPress={() => setConfirming(true)}
                   accessibilityLabel="Tear out this memory"
                 >
-                  <Scissors size={18} color={theme.colors.textPrimary} />
+                  <WobblyCircle
+                    size={40}
+                    fill="white"
+                    stroke={theme.colors.border}
+                    seed={13}
+                  >
+                    <Scissors size={18} color={theme.colors.textPrimary} />
+                  </WobblyCircle>
                 </TouchableOpacity>
               )}
               <TouchableOpacity
-                style={styles.iconButton}
                 onPress={onClose}
                 disabled={saving}
                 accessibilityLabel="Close"
               >
-                <X size={18} color={theme.colors.textPrimary} />
+                <WobblyCircle
+                  size={40}
+                  fill="white"
+                  stroke={theme.colors.border}
+                  seed={14}
+                >
+                  <X size={18} color={theme.colors.textPrimary} />
+                </WobblyCircle>
               </TouchableOpacity>
             </View>
           </View>
@@ -179,25 +198,31 @@ export default function MemoryModal({
             style={styles.formScroll}
           >
             <ThemedText style={styles.label}>Title</ThemedText>
-            <TextInput
-              value={title}
-              onChangeText={setTitle}
-              placeholder="What did we do?"
-              placeholderTextColor={theme.colors.textSecondary}
-              style={styles.input}
-            />
+            <View style={styles.field}>
+              <TextInput
+                value={title}
+                onChangeText={setTitle}
+                placeholder="What did we do?"
+                placeholderTextColor={theme.colors.textSecondary}
+                style={styles.input}
+              />
+              <WobblyLine stroke={RULE_LINE} strokeWidth={2} seed={32} />
+            </View>
 
             <ThemedText style={styles.label}>Our little note</ThemedText>
-            <TextInput
-              value={description}
-              onChangeText={setDescription}
-              placeholder="How was it? What do we want to remember?"
-              placeholderTextColor={theme.colors.textSecondary}
-              style={styles.noteInput}
-              multiline
-              scrollEnabled={false}
-              textAlignVertical="top"
-            />
+            <View style={styles.field}>
+              <TextInput
+                value={description}
+                onChangeText={setDescription}
+                placeholder="How was it? What do we want to remember?"
+                placeholderTextColor={theme.colors.textSecondary}
+                style={styles.noteInput}
+                multiline
+                scrollEnabled={false}
+                textAlignVertical="top"
+              />
+              <WobblyLine stroke={RULE_LINE} strokeWidth={2} seed={33} />
+            </View>
 
             <ThemedText style={styles.label}>How was it?</ThemedText>
             <View style={styles.ratingRow}>
@@ -304,7 +329,7 @@ export default function MemoryModal({
               )}
             </TouchableOpacity>
           </View>
-        </View>
+        </WobblyBox>
 
         <ConfirmDialog
           visible={confirming}
@@ -328,16 +353,11 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   sheet: {
-    backgroundColor: "#FFFBEF",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
     paddingHorizontal: theme.spacing.lg,
     paddingTop: theme.spacing.lg,
-    paddingBottom: 24,
+    paddingBottom: 30,
+    marginBottom: -6, // hides the wobbly bottom edge just below the screen
     maxHeight: "92%",
-    borderWidth: 2.5,
-    borderBottomWidth: 0,
-    borderColor: theme.colors.border,
   },
   headerRow: {
     flexDirection: "row",
@@ -369,16 +389,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
   },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "white",
-    borderWidth: 2,
-    borderColor: theme.colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
 
   // form
   formScroll: {
@@ -390,42 +400,15 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     marginBottom: 2,
   },
+  field: {
+    marginBottom: theme.spacing.md,
+  },
   input: {
-    backgroundColor: "transparent",
-    borderBottomWidth: 2,
-    borderBottomColor: RULE_LINE,
     paddingHorizontal: 4,
     paddingVertical: 4,
     fontFamily: "IndieFlower",
     fontSize: 22,
     color: theme.colors.textPrimary,
-    marginBottom: theme.spacing.md,
-  },
-
-  // sticky note
-  noteWrap: {
-    backgroundColor: "#FFF6B8",
-    borderRadius: 4,
-    marginTop: 10,
-    marginBottom: theme.spacing.md,
-    marginHorizontal: 2,
-    transform: [{ rotate: "-0.5deg" }],
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 5,
-    elevation: 3,
-  },
-  noteTape: {
-    position: "absolute",
-    top: -9,
-    alignSelf: "center",
-    width: 50,
-    height: 16,
-    backgroundColor: theme.colors.accent + "99",
-    borderRadius: 3,
-    transform: [{ rotate: "-2deg" }],
-    zIndex: 2,
   },
   noteInput: {
     minHeight: 78,
@@ -436,9 +419,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     lineHeight: 26,
     color: theme.colors.textPrimary,
-    borderBottomWidth: 2,
-    borderBottomColor: RULE_LINE,
-    marginBottom: theme.spacing.md,
   },
 
   // rating

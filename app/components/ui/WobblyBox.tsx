@@ -19,6 +19,19 @@ function rng(seed: number) {
   };
 }
 
+// turn any string (like an id) into a stable seed number
+export const hashSeed = (s: string) => {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+};
+
+// the outline always sits BEHIND the content, so icons and text stay visible
+const behind = {
+  ...StyleSheet.absoluteFillObject,
+  zIndex: -1,
+};
+
 function wobblyPath(w: number, h: number, seed: number, rough: number) {
   const r = rng(seed);
   const pad = rough * 2 + 2;
@@ -42,6 +55,7 @@ function wobblyPath(w: number, h: number, seed: number, rough: number) {
     const [bx, by] = corners[(i + 1) % 4];
     const len = Math.hypot(bx - ax, by - ay);
     const segs = Math.max(2, Math.round(len / 50));
+
     // Unit normal: wobble pushes the line sideways only
     const nx = -(by - ay) / len;
     const ny = (bx - ax) / len;
@@ -50,9 +64,9 @@ function wobblyPath(w: number, h: number, seed: number, rough: number) {
       const tMid = (s + 0.5) / segs;
       const tEnd = (s + 1) / segs;
 
-      // Alternate direction each bump, with some random strength
       dir *= -1;
       const off = dir * rough * 1.5 * (0.6 + 0.4 * r());
+
       const cx = ax + (bx - ax) * tMid + nx * off;
       const cy = ay + (by - ay) * tMid + ny * off;
       const ex = ax + (bx - ax) * tEnd;
@@ -63,14 +77,16 @@ function wobblyPath(w: number, h: number, seed: number, rough: number) {
   return d + " Z";
 }
 
+/* ---------- Box (cards, sheets, buttons, pages) ---------- */
+
 interface WobblyBoxProps {
   children?: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   stroke?: string;
   fill?: string;
   strokeWidth?: number;
-  roughness?: number; // how wiggly (px)
-  seed?: number; // change for a different squiggle
+  roughness?: number;
+  seed?: number;
 }
 
 export default function WobblyBox({
@@ -97,16 +113,138 @@ export default function WobblyBox({
   return (
     <View onLayout={onLayout} style={style}>
       {d && (
-        <Svg
-          width={size.w}
-          height={size.h}
-          style={StyleSheet.absoluteFill}
-          pointerEvents="none"
-        >
+        <Svg width={size.w} height={size.h} style={behind} pointerEvents="none">
           <Path d={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
         </Svg>
       )}
       {children}
+    </View>
+  );
+}
+
+/* ---------- Circle (checkboxes, round icon buttons) ---------- */
+
+interface WobblyCircleProps {
+  size: number;
+  children?: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+  stroke?: string;
+  fill?: string;
+  strokeWidth?: number;
+  roughness?: number;
+  seed?: number;
+}
+
+export function WobblyCircle({
+  size,
+  children,
+  style,
+  stroke = "#5a4a42",
+  fill = "transparent",
+  strokeWidth = 2,
+  roughness = 0.8,
+  seed = 1,
+}: WobblyCircleProps) {
+  const d = useMemo(() => {
+    const r = rng(seed);
+    const n = 10;
+    const c = size / 2;
+    const base = c - strokeWidth - roughness;
+    const pts: [number, number][] = [];
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+      const rad = base + (r() - 0.5) * 2 * roughness;
+      pts.push([c + Math.cos(a) * rad, c + Math.sin(a) * rad]);
+    }
+    const mid = (a: number[], b: number[]) => [
+      (a[0] + b[0]) / 2,
+      (a[1] + b[1]) / 2,
+    ];
+    const start = mid(pts[n - 1], pts[0]);
+    let path = `M ${start[0]} ${start[1]}`;
+    for (let i = 0; i < n; i++) {
+      const p = pts[i];
+      const m = mid(p, pts[(i + 1) % n]);
+      path += ` Q ${p[0]} ${p[1]} ${m[0]} ${m[1]}`;
+    }
+    return path + " Z";
+  }, [size, strokeWidth, roughness, seed]);
+
+  return (
+    <View
+      style={[
+        {
+          width: size,
+          height: size,
+          alignItems: "center",
+          justifyContent: "center",
+        },
+        style,
+      ]}
+    >
+      <Svg width={size} height={size} style={behind} pointerEvents="none">
+        <Path d={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
+      </Svg>
+      {children}
+    </View>
+  );
+}
+
+/* ---------- Line (notebook rules, input underlines) ---------- */
+
+const LINE_H = 6;
+
+interface WobblyLineProps {
+  style?: StyleProp<ViewStyle>;
+  stroke?: string;
+  strokeWidth?: number;
+  roughness?: number;
+  seed?: number;
+}
+
+export function WobblyLine({
+  style,
+  stroke = "#D9CDB4",
+  strokeWidth = 1.5,
+  roughness = 1.2,
+  seed = 1,
+}: WobblyLineProps) {
+  const [w, setW] = useState(0);
+
+  const d = useMemo(() => {
+    if (!w) return null;
+    const r = rng(seed);
+    const segs = Math.max(2, Math.round(w / 50));
+    const mid = LINE_H / 2;
+    let dir = 1;
+    let path = `M 0 ${mid}`;
+    for (let i = 0; i < segs; i++) {
+      dir *= -1;
+      const off = dir * roughness * 1.5 * (0.6 + 0.4 * r());
+      const xa = (w / segs) * i;
+      const xb = (w / segs) * (i + 1);
+      path += ` Q ${(xa + xb) / 2} ${mid + off} ${xb} ${mid}`;
+    }
+    return path;
+  }, [w, roughness, seed]);
+
+  return (
+    <View
+      style={[{ height: LINE_H }, style]}
+      onLayout={(e) => setW(e.nativeEvent.layout.width)}
+      pointerEvents="none"
+    >
+      {d && (
+        <Svg width={w} height={LINE_H}>
+          <Path
+            d={d}
+            fill="none"
+            stroke={stroke}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+          />
+        </Svg>
+      )}
     </View>
   );
 }

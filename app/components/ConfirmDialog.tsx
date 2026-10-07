@@ -1,9 +1,12 @@
 import { ThemedText } from "@/components/themed-text";
 import { Scissors } from "@sketchyicons/react-native";
+import { Image } from "expo-image";
 import React from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { PAPER } from "../../config/paper";
 import { theme } from "../../config/theme";
+import { pickTape } from "../../config/washi";
+import WobblyBox from "./ui/WobblyBox";
 
 interface ConfirmDialogProps {
   visible: boolean;
@@ -27,10 +30,27 @@ export default function ConfirmDialog({
 }: ConfirmDialogProps) {
   if (!visible) return null;
 
+  // random washi tape, stable for a given dialog title
+  const tape = pickTape(title);
+
   return (
     <View style={styles.backdrop}>
-      <View style={styles.card}>
-        <View style={styles.tape} />
+      <WobblyBox
+        style={styles.card}
+        fill={PAPER}
+        stroke={theme.colors.border}
+        strokeWidth={2.5}
+        seed={21}
+      >
+        <Image
+          source={tape.source}
+          contentFit="contain"
+          style={[
+            styles.tape,
+            { transform: [{ rotate: `${tape.rotate}deg` }] },
+          ]}
+          pointerEvents="none"
+        />
         <Scissors
           size={32}
           color={theme.colors.textPrimary}
@@ -41,19 +61,37 @@ export default function ConfirmDialog({
 
         <View style={styles.buttons}>
           <TouchableOpacity
-            style={[styles.button, styles.cancelButton]}
+            style={styles.buttonWrap}
             onPress={onCancel}
+            activeOpacity={0.8}
           >
-            <ThemedText style={styles.cancelText}>{cancelLabel}</ThemedText>
+            <WobblyBox
+              style={styles.button}
+              fill="white"
+              stroke={theme.colors.border}
+              strokeWidth={2.5}
+              seed={22}
+            >
+              <ThemedText style={styles.cancelText}>{cancelLabel}</ThemedText>
+            </WobblyBox>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.button, styles.confirmButton]}
+            style={styles.buttonWrap}
             onPress={onConfirm}
+            activeOpacity={0.8}
           >
-            <ThemedText style={styles.confirmText}>{confirmLabel}</ThemedText>
+            <WobblyBox
+              style={styles.button}
+              fill="#D9534F"
+              stroke="#D9534F"
+              strokeWidth={2.5}
+              seed={23}
+            >
+              <ThemedText style={styles.confirmText}>{confirmLabel}</ThemedText>
+            </WobblyBox>
           </TouchableOpacity>
         </View>
-      </View>
+      </WobblyBox>
     </View>
   );
 }
@@ -70,29 +108,19 @@ const styles = StyleSheet.create({
   card: {
     width: "100%",
     maxWidth: 340,
-    backgroundColor: PAPER,
-    borderRadius: 22,
-    borderWidth: 2.5,
-    borderColor: theme.colors.border,
     paddingHorizontal: 22,
-    paddingTop: 26,
+    paddingTop: 30,
     paddingBottom: 20,
     alignItems: "center",
   },
+  // washi tape image (rotation is set in the component)
   tape: {
     position: "absolute",
-    top: -10,
+    top: -14,
     alignSelf: "center",
-    width: 60,
-    height: 20,
-    backgroundColor: theme.colors.accent + "99",
-    borderRadius: 3,
-    transform: [{ rotate: "-2deg" }],
-  },
-  emoji: {
-    fontSize: 32,
-    lineHeight: 40,
-    marginBottom: 4,
+    width: 90,
+    height: 30,
+    zIndex: 2,
   },
   title: {
     fontFamily: "IndieFlower",
@@ -107,39 +135,24 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 18,
   },
-
   buttons: {
     width: "100%",
     flexDirection: "row",
     gap: 12,
   },
-
-  button: {
+  buttonWrap: {
     flex: 1,
+  },
+  button: {
     height: 52,
-    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
   },
-
-  cancelButton: {
-    backgroundColor: "white",
-    borderWidth: 2.5,
-    borderColor: theme.colors.border,
-  },
-
   cancelText: {
     color: theme.colors.textPrimary,
     fontWeight: "600",
     fontSize: 16,
   },
-
-  confirmButton: {
-    backgroundColor: "#D9534F",
-    borderWidth: 2.5,
-    borderColor: "#D9534F",
-  },
-
   confirmText: {
     color: "white",
     fontWeight: "600",

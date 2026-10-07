@@ -25,6 +25,7 @@ import { RULE_LINE } from "../../config/paper";
 import { theme } from "../../config/theme";
 import { BucketItem, NewBucketItem } from "../../lib/supabase";
 import ConfirmDialog from "./ConfirmDialog";
+import WobblyBox, { WobblyCircle, WobblyLine } from "./ui/WobblyBox";
 
 type Period = "soon" | "someday";
 
@@ -86,7 +87,7 @@ export default function DreamModal({
   onComplete,
 }: DreamModalProps) {
   const [title, setTitle] = useState("");
-  const [category, setCategory] = useState("travel");
+  const [category, setCategory] = useState("food");
   const [addedBy, setAddedBy] = useState("A");
   const [period, setPeriod] = useState<Period>("soon");
   const [confirming, setConfirming] = useState(false);
@@ -97,7 +98,7 @@ export default function DreamModal({
     if (!visible) return;
     setConfirming(false);
     setTitle(goal?.title ?? "");
-    setCategory(goal?.category ?? "travel");
+    setCategory(goal?.category ?? "food");
     setAddedBy(goal?.added_by ?? "A");
     setPeriod(
       goal?.period === "year" || goal?.period === "someday"
@@ -125,7 +126,13 @@ export default function DreamModal({
         style={styles.overlay}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <View style={styles.sheet}>
+        <WobblyBox
+          style={styles.sheet}
+          fill="#FFFBEF"
+          stroke={theme.colors.border}
+          strokeWidth={2.5}
+          seed={5}
+        >
           {/* Header: title + small icon buttons */}
           <View style={styles.headerRow}>
             <View style={styles.headingBox}>
@@ -137,19 +144,28 @@ export default function DreamModal({
             <View style={styles.headerActions}>
               {editing && (
                 <TouchableOpacity
-                  style={styles.iconButton}
                   onPress={() => setConfirming(true)}
                   accessibilityLabel="Tear out this dream"
                 >
-                  <Scissors size={18} color={theme.colors.textPrimary} />
+                  <WobblyCircle
+                    size={40}
+                    fill="white"
+                    stroke={theme.colors.border}
+                    seed={11}
+                  >
+                    <Scissors size={18} color={theme.colors.textPrimary} />
+                  </WobblyCircle>
                 </TouchableOpacity>
               )}
-              <TouchableOpacity
-                style={styles.iconButton}
-                onPress={onClose}
-                accessibilityLabel="Close"
-              >
-                <X size={18} color={theme.colors.textPrimary} />
+              <TouchableOpacity onPress={onClose} accessibilityLabel="Close">
+                <WobblyCircle
+                  size={40}
+                  fill="white"
+                  stroke={theme.colors.border}
+                  seed={12}
+                >
+                  <X size={18} color={theme.colors.textPrimary} />
+                </WobblyCircle>
               </TouchableOpacity>
             </View>
           </View>
@@ -160,14 +176,17 @@ export default function DreamModal({
             showsVerticalScrollIndicator={false}
             style={styles.formScroll}
           >
-            <TextInput
-              value={title}
-              onChangeText={setTitle}
-              placeholder="What do you dream of?"
-              placeholderTextColor={theme.colors.textSecondary}
-              style={styles.input}
-              autoFocus={!editing}
-            />
+            <View style={styles.field}>
+              <TextInput
+                value={title}
+                onChangeText={setTitle}
+                placeholder="What do you dream of?"
+                placeholderTextColor={theme.colors.textSecondary}
+                style={styles.input}
+                autoFocus={!editing}
+              />
+              <WobblyLine stroke={RULE_LINE} strokeWidth={2} seed={31} />
+            </View>
 
             <ThemedText style={styles.label}>When?</ThemedText>
             <View style={styles.optionsRow}>
@@ -284,14 +303,25 @@ export default function DreamModal({
             {editing && (
               <TouchableOpacity
                 onPress={() => onComplete?.()}
-                style={styles.secondaryButton}
+                style={styles.secondaryWrap}
+                activeOpacity={0.8}
               >
-                <PartyPopper size={20} color={theme.colors.textPrimary} />
-                <ThemedText style={styles.secondaryText}>We did it!</ThemedText>
+                <WobblyBox
+                  style={styles.secondaryButton}
+                  fill="white"
+                  stroke={theme.colors.border}
+                  strokeWidth={2.5}
+                  seed={41}
+                >
+                  <PartyPopper size={20} color={theme.colors.textPrimary} />
+                  <ThemedText style={styles.secondaryText}>
+                    We did it!
+                  </ThemedText>
+                </WobblyBox>
               </TouchableOpacity>
             )}
           </View>
-        </View>
+        </WobblyBox>
 
         <ConfirmDialog
           visible={confirming}
@@ -315,16 +345,11 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   sheet: {
-    backgroundColor: "#FFFBEF",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
     paddingHorizontal: theme.spacing.lg,
     paddingTop: theme.spacing.lg,
-    paddingBottom: 24,
+    paddingBottom: 30,
+    marginBottom: -6, // hides the wobbly bottom edge just below the screen
     maxHeight: "92%",
-    borderWidth: 2.5,
-    borderBottomWidth: 0,
-    borderColor: theme.colors.border,
   },
   headerRow: {
     flexDirection: "row",
@@ -348,31 +373,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
   },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "white",
-    borderWidth: 2,
-    borderColor: theme.colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
 
   // form
   formScroll: {
     flexShrink: 1,
   },
+  field: {
+    marginBottom: theme.spacing.md,
+  },
   input: {
-    backgroundColor: "transparent",
-    borderBottomWidth: 2,
-    borderBottomColor: RULE_LINE,
     paddingHorizontal: 4,
     paddingVertical: 4,
     fontFamily: "IndieFlower",
     fontSize: 22,
     color: theme.colors.textPrimary,
-    marginBottom: theme.spacing.md,
   },
   label: {
     fontFamily: "IndieFlower",
@@ -475,17 +489,15 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontSize: 17,
   },
-  secondaryButton: {
+  secondaryWrap: {
     marginTop: 10,
+  },
+  secondaryButton: {
     paddingVertical: 13,
-    borderRadius: 16,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "white",
-    borderWidth: 2.5,
-    borderColor: theme.colors.border,
   },
   secondaryText: {
     color: theme.colors.textPrimary,

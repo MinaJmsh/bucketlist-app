@@ -21,6 +21,7 @@ import { getCategoryColor, getCategoryIcon } from "../../config/categories";
 import { PAPER } from "../../config/paper";
 import { getRating } from "../../config/ratings";
 import { theme } from "../../config/theme";
+import { pickTape } from "../../config/washi";
 import { BucketItem } from "../../lib/supabase";
 import { GridPaper, StickerLayer } from "./PaperDecor";
 
@@ -42,6 +43,18 @@ const daysBetween = (a: string, b: string) =>
 const seedFrom = (id: string) =>
   id.split("").reduce((sum, c) => sum + c.charCodeAt(0), 0) % 40;
 
+// one washi tape piece, random but stable for a given key
+function Tape({ tapeKey, style }: { tapeKey: string; style: object }) {
+  const tape = pickTape(tapeKey);
+  return (
+    <Image
+      source={tape.source}
+      contentFit="contain"
+      style={[style, { transform: [{ rotate: `${tape.rotate}deg` }] }]}
+    />
+  );
+}
+
 interface MemoryViewerProps {
   visible: boolean;
   goal: BucketItem | null;
@@ -59,7 +72,6 @@ export default function MemoryViewer({
 
   const photos = goal.photos ?? [];
   const color = getCategoryColor(goal.category);
-  // const icon = getCategoryIcon(goal.category);
   const CategoryIcon = getCategoryIcon(goal.category);
   const days =
     goal.completed_at && goal.created_at
@@ -94,7 +106,7 @@ export default function MemoryViewer({
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator={false}
           >
-            <View style={styles.topTape} />
+            <Tape tapeKey={goal.id + "top"} style={styles.topTape} />
 
             <ThemedText style={styles.title}>{goal.title}</ThemedText>
 
@@ -176,7 +188,7 @@ export default function MemoryViewer({
                       },
                     ]}
                   >
-                    <View style={styles.tape} />
+                    <Tape tapeKey={goal.id + "photo" + i} style={styles.tape} />
                     <Image
                       source={{ uri }}
                       style={styles.photo}
@@ -195,7 +207,7 @@ export default function MemoryViewer({
                     { transform: [{ rotate: "-3deg" }] },
                   ]}
                 >
-                  <View style={styles.tape} />
+                  <Tape tapeKey={goal.id + "photo0"} style={styles.tape} />
                   <View
                     style={[
                       styles.photo,
@@ -203,7 +215,7 @@ export default function MemoryViewer({
                       { backgroundColor: color + "40" },
                     ]}
                   >
-                    <CategoryIcon size={60} color={color} />{" "}
+                    <CategoryIcon size={60} color={color} />
                   </View>
                   <ThemedText style={styles.photoCaption}>
                     {goal.title}
@@ -214,7 +226,7 @@ export default function MemoryViewer({
 
             {/* sticky note */}
             <View style={styles.note}>
-              <View style={styles.noteTape} />
+              <Tape tapeKey={goal.id + "note"} style={styles.noteTape} />
               <ThemedText style={styles.noteHeading}>
                 our little note
               </ThemedText>
@@ -292,15 +304,13 @@ const styles = StyleSheet.create({
     paddingTop: 40,
     paddingBottom: 26,
   },
+  // washi tape images (rotation is set per tape in <Tape />)
   topTape: {
     position: "absolute",
-    top: 12,
+    top: 8,
     alignSelf: "center",
-    width: 90,
-    height: 24,
-    backgroundColor: theme.colors.accent + "99",
-    borderRadius: 3,
-    transform: [{ rotate: "-1.5deg" }],
+    width: 110,
+    height: 32,
   },
   title: {
     fontFamily: "IndieFlower",
@@ -352,13 +362,10 @@ const styles = StyleSheet.create({
   },
   tape: {
     position: "absolute",
-    top: -9,
+    top: -12,
     alignSelf: "center",
-    width: 48,
-    height: 18,
-    backgroundColor: theme.colors.secondary + "99",
-    borderRadius: 3,
-    transform: [{ rotate: "2deg" }],
+    width: 70,
+    height: 26,
     zIndex: 2,
   },
   photo: {
@@ -368,9 +375,6 @@ const styles = StyleSheet.create({
   noPhoto: {
     alignItems: "center",
     justifyContent: "center",
-  },
-  noPhotoIcon: {
-    fontSize: 60,
   },
   photoCaption: {
     fontFamily: "IndieFlower",
@@ -395,13 +399,11 @@ const styles = StyleSheet.create({
   },
   noteTape: {
     position: "absolute",
-    top: -10,
+    top: -14,
     alignSelf: "center",
-    width: 56,
-    height: 18,
-    backgroundColor: theme.colors.accent + "99",
-    borderRadius: 3,
-    transform: [{ rotate: "-2deg" }],
+    width: 80,
+    height: 26,
+    zIndex: 2,
   },
   noteHeading: {
     fontFamily: "IndieFlower",

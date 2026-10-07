@@ -1,7 +1,9 @@
+import { Image } from "expo-image";
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import Svg, { Defs, Path, Pattern, Rect } from "react-native-svg";
 import { GRID_LINE } from "../../config/paper";
+import { STICKERS } from "../../config/stickers";
 
 export function GridPaper() {
   return (
@@ -28,23 +30,6 @@ export function GridPaper() {
   );
 }
 
-const STICKERS = [
-  "🍓",
-  "🧸",
-  "⭐",
-  "🌈",
-  "🐞",
-  "🍒",
-  "☁️",
-  "🐰",
-  "🦋",
-  "🌼",
-  "🍄",
-  "🎀",
-  "💌",
-  "🍡",
-];
-
 // tiny seeded "random" so stickers stay put between renders
 const rand = (n: number) => {
   const x = Math.sin(n * 9301 + 49297) * 233280;
@@ -62,8 +47,9 @@ export function StickerLayer({
     <>
       {Array.from({ length: count }).map((_, i) => {
         const n = i + seed * 13;
-        const emoji = STICKERS[Math.floor(rand(n + 1) * STICKERS.length)];
+        const source = STICKERS[Math.floor(rand(n + 1) * STICKERS.length)];
         const side = 4 + rand(n + 9) * 10;
+        const size = 50 + rand(n + 5) * 22; // 48 to 70 px
         return (
           <View
             key={i}
@@ -75,7 +61,11 @@ export function StickerLayer({
               transform: [{ rotate: `${(rand(n + 3) - 0.5) * 50}deg` }],
             }}
           >
-            <Text style={{ fontSize: 32 + rand(n + 5) * 16 }}>{emoji}</Text>
+            <Image
+              source={source}
+              contentFit="contain"
+              style={{ width: size, height: size }}
+            />
           </View>
         );
       })}

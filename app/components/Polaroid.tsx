@@ -5,6 +5,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { getCategoryColor, getCategoryIcon } from "../../config/categories";
 import { getRating } from "../../config/ratings";
 import { theme } from "../../config/theme";
+import { pickTape } from "../../config/washi";
 import { BucketItem } from "../../lib/supabase";
 
 const TILTS = [-3, 2, -1.5, 3, -2.5, 1.5];
@@ -28,9 +29,10 @@ export default function Polaroid({ goal, index, onPress }: PolaroidProps) {
   const tilt = TILTS[index % TILTS.length];
   const photos = goal.photos ?? [];
   const color = getCategoryColor(goal.category);
-  // const icon = getCategoryIcon(goal.category);
   const CategoryIcon = getCategoryIcon(goal.category);
   const rating = getRating(goal.rating);
+  // random but stable per memory
+  const tape = pickTape(goal.id);
 
   return (
     <TouchableOpacity
@@ -38,7 +40,12 @@ export default function Polaroid({ goal, index, onPress }: PolaroidProps) {
       onPress={() => onPress(goal)}
       style={[styles.wrap, { transform: [{ rotate: `${tilt}deg` }] }]}
     >
-      <View style={styles.tape} />
+      <Image
+        source={tape.source}
+        contentFit="contain"
+        style={[styles.tape, { transform: [{ rotate: `${tape.rotate}deg` }] }]}
+        pointerEvents="none"
+      />
 
       {photos.length > 0 ? (
         <View style={styles.photoBox}>
@@ -55,7 +62,7 @@ export default function Polaroid({ goal, index, onPress }: PolaroidProps) {
         </View>
       ) : (
         <View style={[styles.photoBox, { backgroundColor: color + "40" }]}>
-          <CategoryIcon size={44} color={color} />{" "}
+          <CategoryIcon size={44} color={color} />
         </View>
       )}
 
@@ -87,13 +94,10 @@ const styles = StyleSheet.create({
   },
   tape: {
     position: "absolute",
-    top: -9,
+    top: -12,
     alignSelf: "center",
-    width: 52,
-    height: 18,
-    backgroundColor: theme.colors.accent + "99",
-    borderRadius: 3,
-    transform: [{ rotate: "-2deg" }],
+    width: 80,
+    height: 28,
     zIndex: 2,
   },
   photoBox: {
@@ -107,9 +111,6 @@ const styles = StyleSheet.create({
   photo: {
     width: "100%",
     height: "100%",
-  },
-  icon: {
-    fontSize: 44,
   },
   countBadge: {
     position: "absolute",
@@ -132,12 +133,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: theme.colors.textPrimary,
   },
-  // date: {
-  //   fontSize: 11,
-  //   textAlign: "center",
-  //   color: theme.colors.textSecondary,
-  //   marginTop: 4,
-  // },
   dateRow: {
     flexDirection: "row",
     alignItems: "center",

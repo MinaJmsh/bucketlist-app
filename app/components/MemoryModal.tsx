@@ -21,6 +21,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { RULE_LINE } from "../../config/paper";
 import { RATINGS, getRating } from "../../config/ratings";
 import { theme } from "../../config/theme";
@@ -52,6 +53,32 @@ interface MemoryModalProps {
   onDelete?: () => void;
 }
 
+/* One clearly separated card per part of the form */
+function Section({
+  label,
+  seed,
+  children,
+}: {
+  label: string;
+  seed: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <WobblyBox
+      style={styles.section}
+      fill="white"
+      stroke={theme.colors.border}
+      strokeWidth={1.5}
+      seed={seed}
+    >
+      <View style={styles.sectionInner}>
+        <ThemedText style={styles.label}>{label}</ThemedText>
+        {children}
+      </View>
+    </WobblyBox>
+  );
+}
+
 export default function MemoryModal({
   visible,
   mode,
@@ -67,6 +94,7 @@ export default function MemoryModal({
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState("");
   const [rating, setRating] = useState<number | null>(null);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (!visible) return;
@@ -131,23 +159,25 @@ export default function MemoryModal({
       transparent
       animationType="slide"
       onRequestClose={onClose}
+      statusBarTranslucent // add if missing
+      navigationBarTranslucent // add if missing
     >
       <KeyboardAvoidingView
         style={styles.overlay}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <WobblyBox
-          style={styles.sheet}
+          style={[styles.sheet, { paddingBottom: 26 + insets.bottom }]}
           fill="#FFFBEF"
           stroke={theme.colors.border}
           strokeWidth={2.5}
           seed={6}
         >
-          {/* Header: title + small icon buttons */}
+          {/* Header */}
           <View style={styles.headerRow}>
             <View style={styles.headingBox}>
               <View style={styles.headingLine}>
-                <HeadingIcon size={26} color={theme.colors.textPrimary} />
+                <HeadingIcon size={20} color={theme.colors.textPrimary} />
                 <ThemedText style={styles.heading}>
                   {isComplete ? "We did it!" : "Edit this memory"}
                 </ThemedText>
@@ -165,12 +195,12 @@ export default function MemoryModal({
                   accessibilityLabel="Tear out this memory"
                 >
                   <WobblyCircle
-                    size={40}
+                    size={32}
                     fill="white"
                     stroke={theme.colors.border}
                     seed={13}
                   >
-                    <Scissors size={18} color={theme.colors.textPrimary} />
+                    <Scissors size={15} color={theme.colors.textPrimary} />
                   </WobblyCircle>
                 </TouchableOpacity>
               )}
@@ -180,12 +210,12 @@ export default function MemoryModal({
                 accessibilityLabel="Close"
               >
                 <WobblyCircle
-                  size={40}
+                  size={32}
                   fill="white"
                   stroke={theme.colors.border}
                   seed={14}
                 >
-                  <X size={18} color={theme.colors.textPrimary} />
+                  <X size={15} color={theme.colors.textPrimary} />
                 </WobblyCircle>
               </TouchableOpacity>
             </View>
@@ -197,8 +227,7 @@ export default function MemoryModal({
             showsVerticalScrollIndicator={false}
             style={styles.formScroll}
           >
-            <ThemedText style={styles.label}>Title</ThemedText>
-            <View style={styles.field}>
+            <Section label="Title" seed={21}>
               <TextInput
                 value={title}
                 onChangeText={setTitle}
@@ -207,10 +236,9 @@ export default function MemoryModal({
                 style={styles.input}
               />
               <WobblyLine stroke={RULE_LINE} strokeWidth={2} seed={32} />
-            </View>
+            </Section>
 
-            <ThemedText style={styles.label}>Our little note</ThemedText>
-            <View style={styles.field}>
+            <Section label="Our little note" seed={22}>
               <TextInput
                 value={description}
                 onChangeText={setDescription}
@@ -222,89 +250,94 @@ export default function MemoryModal({
                 textAlignVertical="top"
               />
               <WobblyLine stroke={RULE_LINE} strokeWidth={2} seed={33} />
-            </View>
+            </Section>
 
-            <ThemedText style={styles.label}>How was it?</ThemedText>
-            <View style={styles.ratingRow}>
-              {RATINGS.map((r) => {
-                const active = rating === r.value;
-                return (
-                  <TouchableOpacity
-                    key={r.value}
-                    // tap the selected face again to clear it
-                    onPress={() => setRating(active ? null : r.value)}
-                    hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }}
-                    activeOpacity={0.7}
-                    accessibilityLabel={r.label}
+            <Section label="How was it?" seed={23}>
+              <View style={styles.ratingRow}>
+                {RATINGS.map((r) => {
+                  const active = rating === r.value;
+                  return (
+                    <TouchableOpacity
+                      key={r.value}
+                      // tap the selected face again to clear it
+                      onPress={() => setRating(active ? null : r.value)}
+                      hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }}
+                      activeOpacity={0.7}
+                      accessibilityLabel={r.label}
+                      style={[
+                        styles.ratingFace,
+                        {
+                          opacity: rating === null || active ? 1 : 0.4,
+                          transform: [
+                            { scale: active ? 1.2 : 1 },
+                            { rotate: active ? "-6deg" : "0deg" },
+                          ],
+                        },
+                      ]}
+                    >
+                      <r.Icon
+                        size={24}
+                        color={active ? r.color : theme.colors.textSecondary}
+                        strokeWidth={active ? 2.5 : 2}
+                      />
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <ThemedText style={styles.ratingCaption}>
+                {getRating(rating)?.label ?? "tap a face"}
+              </ThemedText>
+            </Section>
+
+            <Section
+              label={`Photos (${photos.length}/${MAX_PHOTOS})`}
+              seed={24}
+            >
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.photoStrip}
+                contentContainerStyle={styles.photoStripContent}
+              >
+                <TouchableOpacity
+                  style={styles.addPhoto}
+                  onPress={addPhotos}
+                  activeOpacity={0.8}
+                >
+                  <Camera size={20} color={theme.colors.textSecondary} />
+                  <ThemedText style={styles.addPhotoText}>add</ThemedText>
+                </TouchableOpacity>
+                {photos.map((p, i) => (
+                  <View
+                    key={p.uri + i}
                     style={[
-                      styles.ratingFace,
+                      styles.thumbFrame,
                       {
-                        opacity: rating === null || active ? 1 : 0.4,
                         transform: [
-                          { scale: active ? 1.25 : 1 },
-                          { rotate: active ? "-6deg" : "0deg" },
+                          {
+                            rotate: `${PHOTO_TILTS[i % PHOTO_TILTS.length]}deg`,
+                          },
                         ],
                       },
                     ]}
                   >
-                    <r.Icon
-                      size={30}
-                      color={active ? r.color : theme.colors.textSecondary}
-                      strokeWidth={active ? 2.5 : 2}
+                    <View style={styles.thumbTape} />
+                    <Image
+                      source={{ uri: p.uri }}
+                      style={styles.thumb}
+                      contentFit="cover"
                     />
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            <ThemedText style={styles.ratingCaption}>
-              {getRating(rating)?.label ?? "tap a face"}
-            </ThemedText>
-
-            <ThemedText style={styles.label}>
-              Photos ({photos.length}/{MAX_PHOTOS})
-            </ThemedText>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.photoStrip}
-              contentContainerStyle={styles.photoStripContent}
-            >
-              <TouchableOpacity
-                style={styles.addPhoto}
-                onPress={addPhotos}
-                activeOpacity={0.8}
-              >
-                <Camera size={24} color={theme.colors.textSecondary} />
-                <ThemedText style={styles.addPhotoText}>add</ThemedText>
-              </TouchableOpacity>
-              {photos.map((p, i) => (
-                <View
-                  key={p.uri + i}
-                  style={[
-                    styles.thumbFrame,
-                    {
-                      transform: [
-                        { rotate: `${PHOTO_TILTS[i % PHOTO_TILTS.length]}deg` },
-                      ],
-                    },
-                  ]}
-                >
-                  <View style={styles.thumbTape} />
-                  <Image
-                    source={{ uri: p.uri }}
-                    style={styles.thumb}
-                    contentFit="cover"
-                  />
-                  <TouchableOpacity
-                    style={styles.removePhoto}
-                    onPress={() => removePhoto(i)}
-                    hitSlop={8}
-                  >
-                    <X size={12} color="white" strokeWidth={3} />
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </ScrollView>
+                    <TouchableOpacity
+                      style={styles.removePhoto}
+                      onPress={() => removePhoto(i)}
+                      hitSlop={8}
+                    >
+                      <X size={10} color="white" strokeWidth={3} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            </Section>
           </ScrollView>
 
           {/* Footer: always visible */}
@@ -321,7 +354,7 @@ export default function MemoryModal({
                 <ActivityIndicator color="white" />
               ) : (
                 <>
-                  {isComplete && <Pin size={18} color="white" />}
+                  {isComplete && <Pin size={16} color="white" />}
                   <ThemedText style={styles.primaryText}>
                     {isComplete ? "Stick it in" : "Save changes"}
                   </ThemedText>
@@ -353,9 +386,9 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   sheet: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.lg,
-    paddingBottom: 30,
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.md,
+    paddingBottom: 26,
     marginBottom: -6, // hides the wobbly bottom edge just below the screen
     maxHeight: "92%",
   },
@@ -363,7 +396,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
   },
   headingBox: {
     flex: 1,
@@ -372,52 +405,56 @@ const styles = StyleSheet.create({
   headingLine: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
   },
   heading: {
     flexShrink: 1,
     fontFamily: "IndieFlower",
-    fontSize: 28,
+    fontSize: 22,
     color: theme.colors.textPrimary,
   },
   subheading: {
     fontFamily: "IndieFlower",
-    fontSize: 16,
+    fontSize: 14,
     color: theme.colors.textSecondary,
   },
   headerActions: {
     flexDirection: "row",
-    gap: 8,
+    gap: 6,
   },
 
   // form
   formScroll: {
     flexShrink: 1,
   },
+  section: {
+    marginBottom: 10,
+  },
+  sectionInner: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
   label: {
     fontFamily: "IndieFlower",
-    fontSize: 20,
+    fontSize: 15,
     color: theme.colors.textSecondary,
-    marginBottom: 2,
-  },
-  field: {
-    marginBottom: theme.spacing.md,
+    marginBottom: 4,
   },
   input: {
-    paddingHorizontal: 4,
-    paddingVertical: 4,
+    paddingHorizontal: 2,
+    paddingVertical: 2,
     fontFamily: "IndieFlower",
-    fontSize: 22,
+    fontSize: 18,
     color: theme.colors.textPrimary,
   },
   noteInput: {
-    minHeight: 78,
-    paddingHorizontal: 4,
+    minHeight: 60,
+    paddingHorizontal: 2,
     paddingTop: 2,
     paddingBottom: 4,
     fontFamily: "IndieFlower",
-    fontSize: 20,
-    lineHeight: 26,
+    fontSize: 17,
+    lineHeight: 22,
     color: theme.colors.textPrimary,
   },
 
@@ -426,81 +463,78 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    gap: 6,
-    paddingVertical: 4,
+    gap: 4,
   },
   ratingFace: {
     padding: 4,
   },
   ratingCaption: {
     fontFamily: "IndieFlower",
-    fontSize: 18,
+    fontSize: 15,
     textAlign: "center",
     color: theme.colors.textSecondary,
     marginTop: 2,
-    marginBottom: theme.spacing.sm,
   },
 
   // photos
   photoStrip: {
-    marginBottom: theme.spacing.sm,
+    marginHorizontal: -4,
   },
   photoStripContent: {
-    gap: 14,
-    paddingTop: 12,
-    paddingBottom: 8,
+    gap: 12,
+    paddingTop: 10,
+    paddingBottom: 6,
     paddingHorizontal: 6,
     alignItems: "center",
   },
   addPhoto: {
-    width: 72,
-    height: 84,
+    width: 58,
+    height: 68,
     borderRadius: 4,
     borderWidth: 2,
     borderStyle: "dashed",
     borderColor: theme.colors.border,
     alignItems: "center",
     justifyContent: "center",
-    gap: 0,
     backgroundColor: "transparent",
   },
   addPhotoText: {
     fontFamily: "IndieFlower",
-    fontSize: 16,
+    fontSize: 14,
     color: theme.colors.textSecondary,
   },
   thumbFrame: {
     backgroundColor: "white",
-    padding: 5,
-    paddingBottom: 14,
+    padding: 4,
+    paddingBottom: 11,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.14,
-    shadowRadius: 5,
+    shadowRadius: 4,
     elevation: 3,
   },
   thumbTape: {
     position: "absolute",
-    top: -8,
+    top: -7,
     alignSelf: "center",
-    width: 36,
-    height: 14,
+    width: 28,
+    height: 11,
     backgroundColor: theme.colors.secondary + "99",
     borderRadius: 3,
     transform: [{ rotate: "2deg" }],
     zIndex: 2,
   },
   thumb: {
-    width: 64,
-    height: 64,
+    width: 50,
+    height: 50,
   },
   removePhoto: {
     position: "absolute",
     top: -6,
     right: -6,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: theme.colors.primary,
     alignItems: "center",
     justifyContent: "center",
@@ -509,25 +543,26 @@ const styles = StyleSheet.create({
 
   // footer
   footer: {
-    paddingTop: 10,
+    paddingTop: 8,
   },
   errorText: {
     color: "#D9534F",
+    fontSize: 13,
     textAlign: "center",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   primaryButton: {
-    paddingVertical: 15,
-    borderRadius: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
     backgroundColor: theme.colors.primary,
   },
   primaryText: {
     color: "white",
     fontWeight: "600",
-    fontSize: 17,
+    fontSize: 15,
   },
 });

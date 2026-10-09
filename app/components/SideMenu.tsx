@@ -84,7 +84,14 @@ export default function SideMenu({
   if (!mounted) return null;
 
   return (
-    <Modal transparent visible animationType="none" onRequestClose={onClose}>
+    <Modal
+      transparent
+      visible
+      animationType="none"
+      onRequestClose={onClose}
+      statusBarTranslucent // add if missing
+      navigationBarTranslucent // add if missing
+    >
       <View style={styles.root}>
         <Animated.View style={[styles.backdrop, { opacity: fade }]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />

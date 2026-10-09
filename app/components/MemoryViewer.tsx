@@ -24,7 +24,7 @@ import { theme } from "../../config/theme";
 import { pickTape } from "../../config/washi";
 import { BucketItem } from "../../lib/supabase";
 import CameraViewer from "./CameraViewer";
-import { GridPaper, StickerLayer } from "./PaperDecor";
+import { CornerSticker, GridPaper } from "./PaperDecor";
 import WobblyBox, { WobblyCircle, WobblyLine, hashSeed } from "./ui/WobblyBox";
 
 const TILTS = [-4, 3, -2, 4, -3, 2];
@@ -40,10 +40,6 @@ const formatDate = (dateString: string | null) => {
 
 const daysBetween = (a: string, b: string) =>
   Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000);
-
-// small stable number from the id so each page gets its own stickers
-const seedFrom = (id: string) =>
-  id.split("").reduce((sum, c) => sum + c.charCodeAt(0), 0) % 40;
 
 // one washi tape piece, random but stable for a given key
 function Tape({ tapeKey, style }: { tapeKey: string; style: object }) {
@@ -129,6 +125,8 @@ export default function MemoryViewer({
       onRequestClose={() =>
         cameraIndex !== null ? setCameraIndex(null) : handleClose()
       }
+      statusBarTranslucent
+      navigationBarTranslucent
     >
       <View style={styles.overlay}>
         <WobblyBox
@@ -240,6 +238,13 @@ export default function MemoryViewer({
                         <ThemedText style={styles.photoCaption}>
                           {i === 0 ? goal.title : ""}
                         </ThemedText>
+                        {/* sticker on the photo's top-right corner (no text there) */}
+                        {i % 2 === 0 && (
+                          <CornerSticker
+                            stickerKey={goal.id + "ps" + i}
+                            style={{ top: -10, right: -10 }}
+                          />
+                        )}
                       </WobblyBox>
                     </TouchableOpacity>
                   ))
@@ -274,6 +279,10 @@ export default function MemoryViewer({
                       <ThemedText style={styles.photoCaption}>
                         {goal.title}
                       </ThemedText>
+                      <CornerSticker
+                        stickerKey={goal.id + "ps0"}
+                        style={{ top: -10, right: -10 }}
+                      />
                     </WobblyBox>
                   </View>
                 )}
@@ -312,10 +321,14 @@ export default function MemoryViewer({
                       <Heart size={14} color={theme.colors.textSecondary} />
                     </View>
                   )}
+                  {/* bottom-left corner: the signature is right-aligned, so it's free */}
+                  <CornerSticker
+                    stickerKey={goal.id + "ns"}
+                    size={48}
+                    style={{ bottom: -14, left: -10 }}
+                  />
                 </WobblyBox>
               </View>
-
-              <StickerLayer count={4} seed={seedFrom(goal.id)} />
             </ScrollView>
           </View>
 
@@ -381,9 +394,9 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   content: {
-    paddingHorizontal: 20,
-    paddingTop: 44,
-    paddingBottom: 26,
+    paddingHorizontal: 20, // a bit of room so corner stickers aren't clipped
+    paddingTop: 40,
+    paddingBottom: 30,
   },
   // washi tape images (rotation is set per tape in <Tape />)
   topTape: {
@@ -395,29 +408,35 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: "IndieFlower",
-    fontSize: 32,
-    lineHeight: 38,
+    fontSize: 24,
+    lineHeight: 46,
     textAlign: "center",
     color: theme.colors.textPrimary,
-    marginBottom: 12,
+    marginBottom: 10,
+    paddingHorizontal: 24, // keeps long titles clear of the close button
   },
   tagRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "center",
-    gap: 8,
-    marginBottom: 24,
+    gap: 6,
+    marginBottom: 20,
   },
   tag: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 12,
+    gap: 4,
+    paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 10,
+    flexShrink: 1, // lets the tag shrink to the row width
+    maxWidth: "100%",
   },
   tagText: {
+    flexShrink: 1,
     fontSize: 14,
+    lineHeight: 20,
+    paddingRight: 2, // Android measures text slightly narrow; this stops the last letter being clipped
     color: theme.colors.textPrimary,
   },
   polaroidArea: {
@@ -449,8 +468,8 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   polaroid: {
-    padding: 11,
-    paddingBottom: 12,
+    padding: 9,
+    paddingBottom: 10,
   },
   tape: {
     position: "absolute",
@@ -470,19 +489,20 @@ const styles = StyleSheet.create({
   },
   photoCaption: {
     fontFamily: "IndieFlower",
-    fontSize: 16,
-    lineHeight: 20,
-    minHeight: 20,
+    fontSize: 14,
+    lineHeight: 19,
+    minHeight: 19,
     textAlign: "center",
     color: theme.colors.textPrimary,
-    marginTop: 8,
+    marginTop: 6,
   },
   noteShadow: {
     transform: [{ rotate: "1deg" }],
   },
   note: {
-    padding: 20,
-    paddingTop: 24,
+    padding: 16,
+    paddingTop: 20,
+    paddingBottom: 24, // keeps the bottom-left sticker clear of the text
   },
   noteTape: {
     position: "absolute",
@@ -494,14 +514,15 @@ const styles = StyleSheet.create({
   },
   noteHeading: {
     fontFamily: "IndieFlower",
-    fontSize: 22,
+    fontSize: 18,
+    lineHeight: 24,
     color: theme.colors.textPrimary,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   noteText: {
     fontFamily: "IndieFlower",
-    fontSize: 20,
-    lineHeight: 28,
+    fontSize: 16,
+    lineHeight: 23,
     color: theme.colors.textPrimary,
   },
   noteEmpty: {
@@ -512,31 +533,34 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     alignItems: "center",
     gap: 6,
-    marginTop: 12,
+    marginTop: 10,
   },
   noteSign: {
+    flexShrink: 1,
     fontFamily: "IndieFlower",
-    fontSize: 16,
+    fontSize: 14,
+    lineHeight: 20,
     textAlign: "right",
     color: theme.colors.textSecondary,
   },
   footer: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingHorizontal: 14,
+    paddingBottom: 14,
   },
   footerLine: {
     marginBottom: 10,
   },
   editButton: {
-    paddingVertical: 15,
+    paddingVertical: 12,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
   },
   editText: {
     color: "white",
     fontWeight: "600",
-    fontSize: 17,
+    fontSize: 15,
+    lineHeight: 20,
   },
 });

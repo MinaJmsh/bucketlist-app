@@ -15,11 +15,14 @@ import {
   Modal,
   Platform,
   ScrollView,
+  StyleProp,
   StyleSheet,
   TextInput,
   TouchableOpacity,
   View,
+  ViewStyle,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { quickCategories } from "../../config/categories";
 import { RULE_LINE } from "../../config/paper";
 import { theme } from "../../config/theme";
@@ -46,14 +49,18 @@ interface DreamModalProps {
 function Sticker({
   selected,
   tilt,
+  seed,
   onPress,
   style,
+  innerStyle,
   children,
 }: {
   selected: boolean;
   tilt: number;
+  seed: number;
   onPress: () => void;
-  style?: object;
+  style?: StyleProp<ViewStyle>; // outer: width / flex
+  innerStyle?: StyleProp<ViewStyle>; // inner: padding / alignment
   children: React.ReactNode;
 }) {
   return (
@@ -61,19 +68,26 @@ function Sticker({
       onPress={onPress}
       activeOpacity={0.8}
       style={[
-        styles.sticker,
         style,
         {
           opacity: selected ? 1 : 0.65,
           transform: [
             { rotate: `${selected ? tilt * 1.5 : tilt}deg` },
-            { scale: selected ? 1.06 : 1 },
+            { scale: selected ? 1.05 : 1 },
           ],
         },
       ]}
     >
+      <WobblyBox
+        style={[styles.stickerInner, innerStyle]}
+        fill="white"
+        stroke={selected ? theme.colors.primary : theme.colors.border}
+        strokeWidth={selected ? 2.5 : 2}
+        seed={seed}
+      >
+        {children}
+      </WobblyBox>
       {selected && <View style={styles.stickerTape} />}
-      {children}
     </TouchableOpacity>
   );
 }
@@ -91,6 +105,7 @@ export default function DreamModal({
   const [addedBy, setAddedBy] = useState("A");
   const [period, setPeriod] = useState<Period>("soon");
   const [confirming, setConfirming] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const editing = !!goal;
 
@@ -121,22 +136,24 @@ export default function DreamModal({
       transparent
       animationType="slide"
       onRequestClose={onClose}
+      statusBarTranslucent // add if missing
+      navigationBarTranslucent // add if missing
     >
       <KeyboardAvoidingView
         style={styles.overlay}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <WobblyBox
-          style={styles.sheet}
+          style={[styles.sheet, { paddingBottom: 26 + insets.bottom }]}
           fill="#FFFBEF"
           stroke={theme.colors.border}
           strokeWidth={2.5}
           seed={5}
         >
-          {/* Header: title + small icon buttons */}
+          {/* Header */}
           <View style={styles.headerRow}>
             <View style={styles.headingBox}>
-              <HeadingIcon size={26} color={theme.colors.textPrimary} />
+              <HeadingIcon size={20} color={theme.colors.textPrimary} />
               <ThemedText style={styles.heading}>
                 {editing ? "Edit this dream" : "Write a new dream"}
               </ThemedText>
@@ -148,23 +165,23 @@ export default function DreamModal({
                   accessibilityLabel="Tear out this dream"
                 >
                   <WobblyCircle
-                    size={40}
+                    size={32}
                     fill="white"
                     stroke={theme.colors.border}
                     seed={11}
                   >
-                    <Scissors size={18} color={theme.colors.textPrimary} />
+                    <Scissors size={15} color={theme.colors.textPrimary} />
                   </WobblyCircle>
                 </TouchableOpacity>
               )}
               <TouchableOpacity onPress={onClose} accessibilityLabel="Close">
                 <WobblyCircle
-                  size={40}
+                  size={32}
                   fill="white"
                   stroke={theme.colors.border}
                   seed={12}
                 >
-                  <X size={18} color={theme.colors.textPrimary} />
+                  <X size={15} color={theme.colors.textPrimary} />
                 </WobblyCircle>
               </TouchableOpacity>
             </View>
@@ -195,11 +212,13 @@ export default function DreamModal({
                   key={p.key}
                   selected={period === p.key}
                   tilt={i % 2 === 0 ? -2 : 2}
+                  seed={50 + i}
                   onPress={() => setPeriod(p.key)}
-                  style={styles.optionSticker}
+                  style={styles.flexOne}
+                  innerStyle={styles.optionInner}
                 >
                   <p.Icon
-                    size={26}
+                    size={20}
                     color={
                       period === p.key
                         ? theme.colors.primary
@@ -236,8 +255,10 @@ export default function DreamModal({
                   key={who.key}
                   selected={addedBy === who.key}
                   tilt={i % 2 === 0 ? 2 : -2}
+                  seed={60 + i}
                   onPress={() => setAddedBy(who.key)}
-                  style={styles.polaroidSticker}
+                  style={styles.flexOne}
+                  innerStyle={styles.polaroidInner}
                 >
                   <Image source={who.image} style={styles.personImage} />
                   <ThemedText
@@ -264,11 +285,13 @@ export default function DreamModal({
                   key={cat.id}
                   selected={category === cat.id}
                   tilt={[-3, 2, -2, 3][i % 4]}
+                  seed={70 + i}
                   onPress={() => setCategory(cat.id)}
                   style={styles.categorySticker}
+                  innerStyle={styles.categoryInner}
                 >
                   <cat.icon
-                    size={24}
+                    size={20}
                     color={
                       category === cat.id
                         ? theme.colors.primary
@@ -313,7 +336,7 @@ export default function DreamModal({
                   strokeWidth={2.5}
                   seed={41}
                 >
-                  <PartyPopper size={20} color={theme.colors.textPrimary} />
+                  <PartyPopper size={17} color={theme.colors.textPrimary} />
                   <ThemedText style={styles.secondaryText}>
                     We did it!
                   </ThemedText>
@@ -345,9 +368,9 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   sheet: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingTop: theme.spacing.lg,
-    paddingBottom: 30,
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.md,
+    paddingBottom: 26,
     marginBottom: -6, // hides the wobbly bottom edge just below the screen
     maxHeight: "92%",
   },
@@ -355,23 +378,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
   },
   headingBox: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
   },
   heading: {
     flexShrink: 1,
     fontFamily: "IndieFlower",
-    fontSize: 28,
+    fontSize: 22,
     color: theme.colors.textPrimary,
   },
   headerActions: {
     flexDirection: "row",
-    gap: 8,
+    gap: 6,
   },
 
   // form
@@ -379,42 +402,45 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   field: {
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
   },
   input: {
     paddingHorizontal: 4,
     paddingVertical: 4,
     fontFamily: "IndieFlower",
-    fontSize: 22,
+    fontSize: 18,
     color: theme.colors.textPrimary,
   },
   label: {
     fontFamily: "IndieFlower",
-    fontSize: 20,
+    fontSize: 16,
     color: theme.colors.textSecondary,
-    marginBottom: 12,
+    marginBottom: 6,
   },
   optionsRow: {
     flexDirection: "row",
-    gap: 14,
+    gap: 10,
     width: "100%",
-    paddingTop: 8,
+    paddingTop: 4,
     paddingHorizontal: 4,
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.sm,
+  },
+  flexOne: {
+    flex: 1,
   },
   categoriesScroll: {
-    marginBottom: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
   },
   categories: {
     flexDirection: "row",
-    gap: 12,
-    paddingTop: 10,
-    paddingBottom: 8,
+    gap: 10,
+    paddingTop: 8,
+    paddingBottom: 6,
     paddingHorizontal: 6,
   },
   optionLabel: {
     fontFamily: "IndieFlower",
-    fontSize: 18,
+    fontSize: 15,
     color: theme.colors.textPrimary,
   },
   optionLabelActive: {
@@ -422,86 +448,81 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     fontFamily: "IndieFlower",
-    fontSize: 16,
+    fontSize: 13,
     color: theme.colors.textPrimary,
-    marginTop: 2,
+    marginTop: 1,
   },
   categoryTextActive: {
     color: theme.colors.primary,
   },
   personImage: {
-    width: 44,
-    height: 44,
+    width: 34,
+    height: 34,
     resizeMode: "contain",
   },
 
-  // sticker look
-  sticker: {
-    backgroundColor: "white",
+  // sticker look (the outline itself is drawn by WobblyBox)
+  stickerInner: {
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.14,
-    shadowRadius: 5,
-    elevation: 3,
   },
   stickerTape: {
     position: "absolute",
-    top: -9,
+    top: -7,
     alignSelf: "center",
-    width: 44,
-    height: 16,
+    width: 34,
+    height: 13,
     backgroundColor: theme.colors.accent + "99",
     borderRadius: 3,
     transform: [{ rotate: "-2deg" }],
     zIndex: 2,
   },
-  optionSticker: {
-    flex: 1,
+  optionInner: {
     paddingVertical: 8,
-    borderRadius: 4,
+    paddingHorizontal: 6,
+    gap: 2,
   },
-  polaroidSticker: {
-    flex: 1,
-    padding: 6,
-    paddingBottom: 8,
-    borderRadius: 2,
+  polaroidInner: {
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    gap: 2,
   },
   categorySticker: {
-    width: 84,
+    width: 68,
+  },
+  categoryInner: {
     paddingVertical: 8,
-    borderRadius: 18,
+    paddingHorizontal: 4,
   },
 
   // footer
   footer: {
-    paddingTop: 10,
+    paddingTop: 8,
   },
   primaryButton: {
-    paddingVertical: 15,
-    borderRadius: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
     alignItems: "center",
     backgroundColor: theme.colors.primary,
   },
   primaryText: {
     color: "white",
     fontWeight: "600",
-    fontSize: 17,
+    fontSize: 15,
   },
   secondaryWrap: {
-    marginTop: 10,
+    marginTop: 8,
   },
   secondaryButton: {
-    paddingVertical: 13,
+    paddingVertical: 10,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
   },
   secondaryText: {
     color: theme.colors.textPrimary,
     fontWeight: "600",
-    fontSize: 17,
+    fontSize: 15,
   },
 });

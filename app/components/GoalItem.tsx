@@ -25,7 +25,7 @@ export default function GoalItem({ goal, onOpen, onComplete }: GoalItemProps) {
     >
       <TouchableOpacity onPress={() => onComplete(goal)} hitSlop={12}>
         <WobblyCircle
-          size={24}
+          size={22}
           stroke={theme.colors.border}
           strokeWidth={2}
           seed={seed}
@@ -36,7 +36,7 @@ export default function GoalItem({ goal, onOpen, onComplete }: GoalItemProps) {
         {goal.title}
       </ThemedText>
 
-      <CategoryIcon size={20} strokeWidth={1.5} />
+      <CategoryIcon size={18} strokeWidth={1.5} />
       <Image
         source={
           goal.added_by === "A"
@@ -73,12 +73,12 @@ const styles = StyleSheet.create({
   title: {
     flex: 1,
     fontFamily: "IndieFlower",
-    fontSize: 21,
+    fontSize: 18,
     color: theme.colors.textPrimary,
   },
   personImage: {
-    width: 28,
-    height: 28,
+    width: 26,
+    height: 26,
     resizeMode: "contain",
   },
 });

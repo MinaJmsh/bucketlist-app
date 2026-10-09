@@ -1,8 +1,15 @@
 import { ThemedText } from "@/components/themed-text";
 import {
+  ArrowDownAZ,
   BookOpen,
+  CalendarArrowDown,
+  CalendarArrowUp,
+  Check,
+  ChevronDown,
   Dices,
   Flower2,
+  Funnel,
+  FunnelX,
   Image,
   Lightbulb,
   Menu,
@@ -10,33 +17,98 @@ import {
   NotebookPen,
   Pencil,
   Plus,
+  Sparkles,
+  Star,
+  Users,
 } from "@sketchyicons/react-native";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Animated,
+  ImageSourcePropType,
+  Modal,
   Platform,
+  Pressable,
+  Image as RNImage,
   ScrollView,
   StatusBar,
   StyleSheet,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
-import { MARGIN_LINE, PAPER, ROW_HEIGHT } from "../../config/paper";
+import { quickCategories } from "../../config/categories";
+import { MARGIN_LINE, PAPER, ROW_HEIGHT, RULE_LINE } from "../../config/paper";
 import { theme } from "../../config/theme";
 import { BucketItem, NewBucketItem, supabase } from "../../lib/supabase";
 import DreamModal from "../components/DreamModal";
 import GoalItem from "../components/GoalItem";
 import MemoryModal, { MemoryValues } from "../components/MemoryModal";
 import MemoryViewer from "../components/MemoryViewer";
-import { GridPaper, StickerLayer } from "../components/PaperDecor";
+import {
+  BackgroundStickers,
+  GinghamBackground,
+  GridPaper,
+  StickerLayer,
+} from "../components/PaperDecor";
 import Polaroid from "../components/Polaroid";
 import SideMenu, { MenuItem } from "../components/SideMenu";
-import WobblyBox from "../components/ui/WobblyBox";
+import WobblyBox, { WobblyLine } from "../components/ui/WobblyBox";
 
 type Bucket = "soon" | "someday";
 type PageTab = "dreams" | "memories";
+type DreamSort = "newest" | "oldest" | "az";
+type MemorySort = "recent" | "oldest" | "az" | "rating";
+
+type IconType = React.ComponentType<{ size?: number; color?: string }>;
+
+type SortOption<T extends string> = {
+  key: T;
+  label: string;
+  Icon: IconType;
+};
+
+const DREAM_SORTS: SortOption<DreamSort>[] = [
+  { key: "newest", label: "newest first", Icon: CalendarArrowDown },
+  { key: "oldest", label: "oldest first", Icon: CalendarArrowUp },
+  { key: "az", label: "A to Z", Icon: ArrowDownAZ },
+];
+
+const MEMORY_SORTS: SortOption<MemorySort>[] = [
+  { key: "recent", label: "most recent", Icon: CalendarArrowDown },
+  { key: "oldest", label: "oldest first", Icon: CalendarArrowUp },
+  { key: "az", label: "A to Z", Icon: ArrowDownAZ },
+  { key: "rating", label: "best rated", Icon: Star },
+];
+
+// filters: who wrote it + which sticker (category)
+type WhoFilter = "all" | "A" | "B";
+type Filters = { who: WhoFilter; cat: string };
+const NO_FILTERS: Filters = { who: "all", cat: "all" };
+
+const WHO_OPTIONS: {
+  key: WhoFilter;
+  label: string;
+  Icon?: IconType;
+  image?: ImageSourcePropType;
+}[] = [
+  { key: "all", label: "everyone", Icon: Users },
+  {
+    key: "A",
+    label: "mina",
+    image: require("../../assets/images/mina2.png"),
+  },
+  {
+    key: "B",
+    label: "parsa",
+    image: require("../../assets/images/parsa2.png"),
+  },
+];
+
+const matchesFilters = (g: BucketItem, f: Filters) =>
+  (f.who === "all" || g.added_by === f.who) &&
+  (f.cat === "all" || g.category === f.cat);
 
 // legacy values (week/month/year) still work
 const bucketOf = (g: BucketItem): Bucket =>
@@ -50,6 +122,7 @@ const MENU_ITEMS: MenuItem[] = [
 
 const HOLES = 8;
 const BORDER_WIDTH = 2.5;
+const GRAY = "#E6E4DF"; // selected / active highlight
 
 // iOS needs a beat between two modals; web/android don't
 const modalDelay = Platform.OS === "ios" ? 350 : 0;
@@ -88,13 +161,261 @@ function TabButton({
   );
 }
 
+// Shared shell for the filter + sort dropdowns: a wobbly button that opens a
+// wobbly paper menu floating ON TOP of the page (in a Modal, so nothing below
+// it moves).
+function MenuButton({
+  Icon,
+  label,
+  highlighted,
+  seed,
+  menuWidth,
+  children,
+}: {
+  Icon: IconType;
+  label: string;
+  highlighted?: boolean;
+  seed: number;
+  menuWidth: number;
+  children: (close: () => void) => React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const [anchor, setAnchor] = useState({ x: 0, y: 0, w: 0, h: 0 });
+  const buttonRef = useRef<View>(null);
+  const { width: screenW, height: screenH } = useWindowDimensions();
+
+  // measure where the button is on screen, then open the menu under it
+  const openMenu = () => {
+    buttonRef.current?.measureInWindow((x, y, w, h) => {
+      setAnchor({ x, y, w, h });
+      setOpen(true);
+    });
+  };
+
+  const top = anchor.y + anchor.h + 4;
+  const left = Math.min(Math.max(8, anchor.x), screenW - menuWidth - 8);
+  const maxMenuHeight = Math.max(160, Math.min(380, screenH - top - 24));
+
+  return (
+    <>
+      <View ref={buttonRef} collapsable={false}>
+        <TouchableOpacity activeOpacity={0.8} onPress={openMenu}>
+          <WobblyBox
+            style={styles.menuButton}
+            fill={highlighted ? GRAY : "white"}
+            stroke={theme.colors.border}
+            strokeWidth={2}
+            seed={seed}
+          >
+            <View style={styles.menuButtonInner}>
+              <Icon size={16} color={theme.colors.textPrimary} />
+              <ThemedText style={styles.menuButtonText}>{label}</ThemedText>
+              <View style={open ? styles.caretOpen : undefined}>
+                <ChevronDown size={14} color={theme.colors.textSecondary} />
+              </View>
+            </View>
+          </WobblyBox>
+        </TouchableOpacity>
+      </View>
+
+      <Modal
+        visible={open}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        navigationBarTranslucent // <- add this line
+        onRequestClose={() => setOpen(false)}
+      >
+        {/* tap anywhere outside the menu to close it */}
+        <Pressable style={styles.menuBackdrop} onPress={() => setOpen(false)}>
+          <Pressable
+            onPress={() => {}}
+            style={{ position: "absolute", top, left }}
+          >
+            <WobblyBox
+              style={{ width: menuWidth }}
+              fill="white"
+              stroke={theme.colors.border}
+              strokeWidth={2}
+              seed={seed + 1}
+            >
+              <ScrollView
+                style={{ maxHeight: maxMenuHeight }}
+                contentContainerStyle={styles.menuInner}
+                showsVerticalScrollIndicator={false}
+                bounces={false}
+              >
+                {children(() => setOpen(false))}
+              </ScrollView>
+            </WobblyBox>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
+  );
+}
+
+// one row in a menu; the picked row gets a gray highlight and a check
+function MenuRow({
+  Icon,
+  image,
+  label,
+  active,
+  onPress,
+}: {
+  Icon?: IconType;
+  image?: ImageSourcePropType;
+  label: string;
+  active?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={onPress}
+      style={[styles.menuRow, active && styles.menuRowActive]}
+    >
+      <View style={styles.menuRowIcon}>
+        {image ? (
+          <RNImage source={image} style={styles.menuHead} />
+        ) : Icon ? (
+          <Icon size={16} color={theme.colors.textPrimary} />
+        ) : null}
+      </View>
+      <ThemedText style={styles.menuRowText}>{label}</ThemedText>
+      {active && <Check size={14} color={theme.colors.textSecondary} />}
+    </TouchableOpacity>
+  );
+}
+
+function SortDropdown<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: SortOption<T>[];
+  value: T;
+  onChange: (key: T) => void;
+}) {
+  const current = options.find((o) => o.key === value) ?? options[0];
+  return (
+    <MenuButton
+      Icon={current.Icon}
+      label={current.label}
+      seed={71}
+      menuWidth={180}
+    >
+      {(close) =>
+        options.map((o, i) => (
+          <View key={o.key}>
+            {i > 0 && (
+              <WobblyLine stroke={RULE_LINE} strokeWidth={2} seed={80 + i} />
+            )}
+            <MenuRow
+              Icon={o.Icon}
+              label={o.label}
+              active={o.key === value}
+              onPress={() => {
+                onChange(o.key);
+                close();
+              }}
+            />
+          </View>
+        ))
+      }
+    </MenuButton>
+  );
+}
+
+function FilterDropdown({
+  value,
+  onChange,
+  seed,
+}: {
+  value: Filters;
+  onChange: (f: Filters) => void;
+  seed: number;
+}) {
+  const count = (value.who !== "all" ? 1 : 0) + (value.cat !== "all" ? 1 : 0);
+  const who = WHO_OPTIONS.find((w) => w.key === value.who);
+  const cat = quickCategories.find((c) => c.id === value.cat);
+  const label =
+    count === 0
+      ? "filters"
+      : count === 2
+        ? "2 filters"
+        : value.who !== "all"
+          ? (who?.label ?? "1 filter")
+          : (cat?.name ?? "1 filter");
+
+  return (
+    <MenuButton
+      Icon={Funnel}
+      label={label}
+      highlighted={count > 0}
+      seed={seed}
+      menuWidth={210}
+    >
+      {() => (
+        <>
+          <ThemedText style={styles.menuHeading}>written by</ThemedText>
+          {WHO_OPTIONS.map((w) => (
+            <MenuRow
+              key={w.key}
+              Icon={w.Icon}
+              image={w.image}
+              label={w.label}
+              active={value.who === w.key}
+              onPress={() => onChange({ ...value, who: w.key })}
+            />
+          ))}
+
+          <WobblyLine stroke={RULE_LINE} strokeWidth={2} seed={seed + 10} />
+
+          <ThemedText style={styles.menuHeading}>sticker</ThemedText>
+          <MenuRow
+            Icon={Sparkles}
+            label="all stickers"
+            active={value.cat === "all"}
+            onPress={() => onChange({ ...value, cat: "all" })}
+          />
+          {quickCategories.map((c) => (
+            <MenuRow
+              key={c.id}
+              Icon={c.icon}
+              label={c.name}
+              active={value.cat === c.id}
+              onPress={() => onChange({ ...value, cat: c.id })}
+            />
+          ))}
+
+          {count > 0 && (
+            <>
+              <WobblyLine stroke={RULE_LINE} strokeWidth={2} seed={seed + 11} />
+              <MenuRow
+                Icon={FunnelX}
+                label="clear filters"
+                onPress={() => onChange(NO_FILTERS)}
+              />
+            </>
+          )}
+        </>
+      )}
+    </MenuButton>
+  );
+}
+
 export default function Index() {
   const [goals, setGoals] = useState<BucketItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [pageTab, setPageTab] = useState<PageTab>("dreams");
   const [menuOpen, setMenuOpen] = useState(false);
-
-  const BG = require("../../assets/images/bg1.jpg");
+  const [dreamSort, setDreamSort] = useState<DreamSort>("newest");
+  const [memorySort, setMemorySort] = useState<MemorySort>("recent");
+  const [dreamFilters, setDreamFilters] = useState<Filters>(NO_FILTERS);
+  const [memoryFilters, setMemoryFilters] = useState<Filters>(NO_FILTERS);
+  // real height of the memories page content, so stickers can follow it
+  const [memoriesHeight, setMemoriesHeight] = useState(0);
 
   const [dreamModal, setDreamModal] = useState<{
     open: boolean;
@@ -235,17 +556,43 @@ export default function Index() {
   };
 
   const viewerGoal = goals.find((g) => g.id === viewerId) ?? null;
+  const stickerArea = Math.max(0, memoriesHeight - 110);
 
-  const activeGoals = goals.filter((g) => !g.completed);
-  const memories = goals
-    .filter((g) => g.completed)
-    .sort(
-      (a, b) =>
-        new Date(b.completed_at || 0).getTime() -
-        new Date(a.completed_at || 0).getTime(),
-    );
-  const soonGoals = activeGoals.filter((g) => bucketOf(g) === "soon");
-  const somedayGoals = activeGoals.filter((g) => bucketOf(g) === "someday");
+  // ---------- sorting ----------
+  const time = (s: string | null | undefined) => new Date(s || 0).getTime();
+  const byTitle = (a: BucketItem, b: BucketItem) =>
+    a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+
+  const sortDreams = (list: BucketItem[]) => {
+    const arr = [...list];
+    if (dreamSort === "az") return arr.sort(byTitle);
+    if (dreamSort === "oldest")
+      return arr.sort((a, b) => time(a.created_at) - time(b.created_at));
+    return arr.sort((a, b) => time(b.created_at) - time(a.created_at));
+  };
+
+  const sortMemories = (list: BucketItem[]) => {
+    const arr = [...list];
+    if (memorySort === "az") return arr.sort(byTitle);
+    if (memorySort === "oldest")
+      return arr.sort((a, b) => time(a.completed_at) - time(b.completed_at));
+    if (memorySort === "rating")
+      return arr.sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
+    return arr.sort((a, b) => time(b.completed_at) - time(a.completed_at));
+  };
+
+  const allActive = goals.filter((g) => !g.completed);
+  const allMemories = goals.filter((g) => g.completed);
+  const activeGoals = allActive.filter((g) => matchesFilters(g, dreamFilters));
+  const memories = sortMemories(
+    allMemories.filter((g) => matchesFilters(g, memoryFilters)),
+  );
+  const soonGoals = sortDreams(
+    activeGoals.filter((g) => bucketOf(g) === "soon"),
+  );
+  const somedayGoals = sortDreams(
+    activeGoals.filter((g) => bucketOf(g) === "someday"),
+  );
 
   if (loading) {
     return (
@@ -266,7 +613,7 @@ export default function Index() {
     items.length > 0 && (
       <View>
         <View style={styles.sectionHeader}>
-          <Icon size={22} color={theme.colors.textPrimary} />
+          <Icon size={18} color={theme.colors.textPrimary} />
           <ThemedText style={styles.sectionTitle}>{title}</ThemedText>
         </View>
         {items.map((goal) => (
@@ -282,6 +629,10 @@ export default function Index() {
 
   return (
     <View style={styles.container}>
+      {/* app background: gingham + stickers, drawn first so the paper covers it */}
+      <GinghamBackground />
+      <BackgroundStickers />
+
       <StatusBar
         barStyle="dark-content"
         backgroundColor={theme.colors.background}
@@ -315,7 +666,7 @@ export default function Index() {
                 pageTab === "dreams" && styles.tabTextActive,
               ]}
             >
-              Dreams {activeGoals.length}
+              Dreams {allActive.length}
             </ThemedText>
           </TabButton>
 
@@ -337,7 +688,7 @@ export default function Index() {
                 pageTab === "memories" && styles.tabTextActive,
               ]}
             >
-              Memories {memories.length}
+              Memories {allMemories.length}
             </ThemedText>
           </TabButton>
         </View>
@@ -367,7 +718,7 @@ export default function Index() {
                 contentContainerStyle={styles.dreamsContent}
                 showsVerticalScrollIndicator={false}
               >
-                {activeGoals.length === 0 && (
+                {allActive.length === 0 && (
                   <View style={styles.emptyState}>
                     <ThemedText style={styles.emptyText}>
                       nothing written yet...{"\n"}tap + to add our first dream
@@ -377,6 +728,29 @@ export default function Index() {
                       color={theme.colors.textSecondary}
                       style={styles.emptyIcon}
                     />
+                  </View>
+                )}
+
+                {allActive.length > 0 && (
+                  <View style={styles.toolbar}>
+                    <FilterDropdown
+                      value={dreamFilters}
+                      onChange={setDreamFilters}
+                      seed={73}
+                    />
+                    <SortDropdown
+                      options={DREAM_SORTS}
+                      value={dreamSort}
+                      onChange={setDreamSort}
+                    />
+                  </View>
+                )}
+
+                {allActive.length > 0 && activeGoals.length === 0 && (
+                  <View style={styles.noMatch}>
+                    <ThemedText style={styles.emptyText}>
+                      no dreams match these filters...
+                    </ThemedText>
                   </View>
                 )}
 
@@ -393,8 +767,9 @@ export default function Index() {
               <ScrollView
                 contentContainerStyle={styles.memoriesContent}
                 showsVerticalScrollIndicator={false}
+                onContentSizeChange={(_, h) => setMemoriesHeight(h)}
               >
-                {memories.length === 0 ? (
+                {allMemories.length === 0 ? (
                   <View style={styles.emptyState}>
                     <ThemedText style={styles.emptyText}>
                       no polaroids yet...{"\n"}finish a dream to stick one here
@@ -407,23 +782,49 @@ export default function Index() {
                   </View>
                 ) : (
                   <>
-                    <View style={styles.polaroidGrid}>
-                      {memories.map((goal, i) => (
-                        <Polaroid
-                          key={goal.id}
-                          goal={goal}
-                          index={i}
-                          onPress={(g) => setViewerId(g.id)}
-                        />
-                      ))}
+                    <View style={[styles.toolbar, styles.toolbarMemories]}>
+                      <FilterDropdown
+                        value={memoryFilters}
+                        onChange={setMemoryFilters}
+                        seed={75}
+                      />
+                      <SortDropdown
+                        options={MEMORY_SORTS}
+                        value={memorySort}
+                        onChange={setMemorySort}
+                      />
                     </View>
-                    <ThemedText style={styles.hint}>
-                      tap a polaroid to open its page
-                    </ThemedText>
+
+                    {memories.length === 0 ? (
+                      <View style={styles.noMatch}>
+                        <ThemedText style={styles.emptyText}>
+                          no memories match these filters...
+                        </ThemedText>
+                      </View>
+                    ) : (
+                      <>
+                        <View style={styles.polaroidGrid}>
+                          {memories.map((goal, i) => (
+                            <Polaroid
+                              key={goal.id}
+                              goal={goal}
+                              index={i}
+                              onPress={(g) => setViewerId(g.id)}
+                            />
+                          ))}
+                        </View>
+                        <ThemedText style={styles.hint}>
+                          tap a polaroid to open its page
+                        </ThemedText>
+                      </>
+                    )}
                   </>
                 )}
                 <StickerLayer
-                  count={Math.max(2, Math.ceil(memories.length / 2) + 1)}
+                  // roughly one sticker per 170px of polaroids, spread over
+                  // the real content height (minus the empty bottom padding)
+                  count={Math.max(4, Math.round(stickerArea / 170))}
+                  height={stickerArea || undefined}
                 />
               </ScrollView>
             )}
@@ -518,6 +919,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 14,
     marginBottom: 14,
+    zIndex: 0,
   },
   tabRow: {
     flexDirection: "row",
@@ -609,9 +1011,89 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontFamily: "IndieFlower",
-    fontSize: 26,
+    fontSize: 20,
     color: theme.colors.textPrimary,
   },
+
+  // filter + sort dropdowns
+  toolbar: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 8,
+    minHeight: ROW_HEIGHT,
+    marginBottom: 4,
+  },
+  toolbarMemories: {
+    marginBottom: 24, // breathing room above the first polaroid
+  },
+  menuButton: {
+    paddingHorizontal: 4,
+    paddingVertical: 3,
+  },
+  menuButtonInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 1,
+  },
+  menuButtonText: {
+    fontFamily: "IndieFlower",
+    fontSize: 14,
+    color: theme.colors.textPrimary,
+  },
+  caretOpen: {
+    transform: [{ rotate: "180deg" }],
+  },
+  menuBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.12)",
+  },
+  menuInner: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  menuHeading: {
+    fontFamily: "IndieFlower",
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+    marginTop: 4,
+    marginBottom: 2,
+    paddingHorizontal: 8,
+  },
+  menuRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  menuRowActive: {
+    backgroundColor: GRAY,
+  },
+  menuRowIcon: {
+    width: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  menuHead: {
+    width: 24,
+    height: 24,
+    resizeMode: "contain",
+  },
+  menuRowText: {
+    flex: 1,
+    fontFamily: "IndieFlower",
+    fontSize: 15,
+    color: theme.colors.textPrimary,
+  },
+  noMatch: {
+    alignItems: "center",
+    paddingVertical: 28,
+  },
+
   polaroidGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -620,7 +1102,7 @@ const styles = StyleSheet.create({
   },
   hint: {
     marginTop: 16,
-    fontSize: 14,
+    fontSize: 12,
     textAlign: "center",
     color: theme.colors.textSecondary,
     opacity: 0.7,
@@ -630,8 +1112,8 @@ const styles = StyleSheet.create({
     paddingVertical: 48,
   },
   emptyText: {
-    fontSize: 20,
-    lineHeight: 28,
+    fontSize: 17,
+    lineHeight: 24,
     color: theme.colors.textSecondary,
     textAlign: "center",
   },
@@ -652,6 +1134,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 8,
+    elevation: 20,
+    zIndex: 20,
   },
 });

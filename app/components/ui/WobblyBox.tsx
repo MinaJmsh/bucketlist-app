@@ -29,9 +29,8 @@ export const hashSeed = (s: string) => {
 // the outline always sits BEHIND the content, so icons and text stay visible
 const behind = {
   ...StyleSheet.absoluteFillObject,
-  zIndex: -1,
+  zIndex: 0,
 };
-
 function wobblyPath(w: number, h: number, seed: number, rough: number) {
   const r = rng(seed);
   const pad = rough * 2 + 2;
@@ -117,7 +116,13 @@ export default function WobblyBox({
           <Path d={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
         </Svg>
       )}
-      {children}
+      {React.Children.map(children, (child) =>
+        React.isValidElement(child)
+          ? React.cloneElement(child as React.ReactElement<any>, {
+              style: [{ zIndex: 1 }, (child.props as any).style],
+            })
+          : child,
+      )}
     </View>
   );
 }
@@ -185,7 +190,15 @@ export function WobblyCircle({
       <Svg width={size} height={size} style={behind} pointerEvents="none">
         <Path d={d} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
       </Svg>
-      {children}
+      <View
+        style={[
+          StyleSheet.absoluteFill,
+          { alignItems: "center", justifyContent: "center", zIndex: 1 },
+        ]}
+        pointerEvents="none"
+      >
+        {children}
+      </View>
     </View>
   );
 }

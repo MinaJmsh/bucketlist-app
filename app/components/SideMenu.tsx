@@ -1,6 +1,5 @@
 import { ThemedText } from "@/components/themed-text";
-import { Heart, Sparkles } from "@sketchyicons/react-native";
-import { Image } from "expo-image";
+import { Heart } from "@sketchyicons/react-native";
 import React, { ComponentType, useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -14,11 +13,10 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { MARGIN_LINE, PAPER, RULE_LINE } from "../../config/paper";
+import Svg, { Circle, Defs, Pattern, Rect } from "react-native-svg";
 import { theme } from "../../config/theme";
-import { pickTape } from "../../config/washi";
 import { CornerSticker } from "./PaperDecor";
-import WobblyBox, { WobblyLine } from "./ui/WobblyBox";
+import WobblyBox from "./ui/WobblyBox";
 
 export type MenuItem = {
   id: string;
@@ -36,10 +34,64 @@ interface SideMenuProps {
 }
 
 const DRAWER_WIDTH = Math.min(290, Dimensions.get("window").width * 0.78);
-const TOP_INSET =
-  Platform.OS === "ios" ? 54 : (StatusBar.currentHeight ?? 24) + 6;
-const HOLES = 7;
 const TILTS = [-1.2, 0.8, -0.6, 1, -0.9];
+
+// scrapbook paper look: tweak these
+const KRAFT = "#EAD9BB"; // paper color
+const KRAFT_DOT = "#cdb68b6f"; // dot pattern
+const STITCH = "#B8604C"; // dashed stitching
+const DOT_GAP = 18;
+
+// kraft paper dots
+function DotPaper() {
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Svg width="100%" height="100%">
+        <Defs>
+          <Pattern
+            id="side-dots"
+            width={DOT_GAP}
+            height={DOT_GAP}
+            patternUnits="userSpaceOnUse"
+          >
+            <Circle
+              cx={DOT_GAP / 2}
+              cy={DOT_GAP / 2}
+              r={1.6}
+              fill={KRAFT_DOT}
+            />
+          </Pattern>
+        </Defs>
+        <Rect width="100%" height="100%" fill="url(#side-dots)" />
+      </Svg>
+    </View>
+  );
+}
+
+// running-stitch border, kept inside the safe areas
+function Stitching({ top, bottom }: { top: number; bottom: number }) {
+  return (
+    <View
+      pointerEvents="none"
+      style={{ position: "absolute", top, bottom, left: 10, right: 12 }}
+    >
+      <Svg width="100%" height="100%">
+        <Rect
+          x={1}
+          y={1}
+          width="99%"
+          height="99%"
+          rx={10}
+          fill="none"
+          stroke={STITCH}
+          strokeWidth={1.8}
+          strokeDasharray="7 5"
+          strokeLinecap="round"
+        />
+      </Svg>
+    </View>
+  );
+}
 
 export default function SideMenu({
   visible,
@@ -53,12 +105,15 @@ export default function SideMenu({
   const fade = useRef(new Animated.Value(0)).current;
   const insets = useSafeAreaInsets();
 
+  // the paper goes edge to edge; content stays inside these safe areas
+  const topInset = Math.max(
+    insets.top,
+    Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) : 0,
+  );
   const bottomInset = Math.max(
     insets.bottom,
     Platform.OS === "android" ? 24 : 0,
   );
-
-  const tape = pickTape("side-menu");
 
   useEffect(() => {
     if (visible) {
@@ -120,50 +175,29 @@ export default function SideMenu({
       </Animated.View>
 
       <Animated.View
-        style={[
-          styles.drawer,
-          {
-            paddingBottom: 20 + bottomInset,
-            transform: [{ translateX: slide }],
-          },
-        ]}
+        style={[styles.drawer, { transform: [{ translateX: slide }] }]}
       >
         <WobblyBox
           style={styles.page}
-          fill={PAPER}
+          fill={KRAFT}
           stroke={theme.colors.border}
           strokeWidth={2.5}
           seed={7}
         >
-          <View style={styles.holes} pointerEvents="none">
-            {Array.from({ length: HOLES }).map((_, i) => (
-              <View key={i} style={styles.hole} />
-            ))}
-          </View>
+          <DotPaper />
+          <Stitching top={topInset + 4} bottom={bottomInset + 4} />
 
-          <View style={styles.marginLine} pointerEvents="none" />
-
-          <Image
-            source={tape.source}
-            contentFit="contain"
-            pointerEvents="none"
+          <View
             style={[
-              styles.tape,
-              { transform: [{ rotate: `${tape.rotate}deg` }] },
+              styles.content,
+              { paddingTop: topInset + 22, paddingBottom: bottomInset + 20 },
             ]}
-          />
-
-          <View style={styles.content}>
-            <View style={styles.titleRow}>
+          >
+            {/* title on a little paper label */}
+            {/* <View style={styles.label}>
               <ThemedText style={styles.title}>our notebook</ThemedText>
               <Sparkles size={18} color={theme.colors.textSecondary} />
-            </View>
-
-            <WobblyLine
-              stroke={theme.colors.border}
-              strokeWidth={2}
-              seed={91}
-            />
+            </View> */}
 
             <ThemedText style={styles.subtitle}>
               pick a page to flip to
@@ -206,11 +240,11 @@ export default function SideMenu({
                       )}
                     </Pressable>
 
-                    <WobblyLine
+                    {/* <WobblyLine
                       stroke={RULE_LINE}
                       strokeWidth={2}
                       seed={100 + i}
-                    />
+                    /> */}
                   </View>
                 );
               })}
@@ -225,7 +259,12 @@ export default function SideMenu({
           <CornerSticker
             stickerKey="side-menu-sticker"
             size={54}
-            style={{ bottom: -6, right: -4 }}
+            style={{ bottom: bottomInset - 6, right: -4 }}
+          />
+          <CornerSticker
+            stickerKey="side-menu-sticker-top"
+            size={46}
+            style={{ top: topInset + 40, right: -2 }}
           />
         </WobblyBox>
       </Animated.View>
@@ -249,56 +288,28 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     width: DRAWER_WIDTH,
-    paddingTop: TOP_INSET - 14,
     paddingRight: 6,
   },
   page: {
     flex: 1,
   },
-  tape: {
-    position: "absolute",
-    top: -8,
-    alignSelf: "center",
-    width: 100,
-    height: 28,
-    zIndex: 3,
-  },
-  holes: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    left: 10,
-    justifyContent: "space-around",
-    paddingVertical: 28,
-  },
-  hole: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: theme.colors.background,
-    borderWidth: 1.5,
-    borderColor: "#D9CDB4",
-  },
-  marginLine: {
-    position: "absolute",
-    top: 8,
-    bottom: 8,
-    left: 36,
-    width: 2,
-    backgroundColor: MARGIN_LINE,
-    opacity: 0.7,
-  },
   content: {
     flex: 1,
-    paddingTop: 30,
-    paddingLeft: 48,
-    paddingRight: 16,
-    paddingBottom: 16,
+    paddingLeft: 28,
+    paddingRight: 24,
   },
-  titleRow: {
+  label: {
+    alignSelf: "flex-start",
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+    backgroundColor: "#FFFDF6",
+    paddingHorizontal: 12,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: theme.colors.border,
+    transform: [{ rotate: "-2deg" }],
   },
   title: {
     fontFamily: "IndieFlower",
@@ -311,7 +322,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     color: theme.colors.textSecondary,
-    marginTop: 4,
+    marginTop: 10,
     marginBottom: 14,
   },
   list: {
@@ -326,7 +337,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   rowActive: {
-    backgroundColor: "rgba(255, 224, 102, 0.55)",
+    backgroundColor: "#b8604c62",
   },
   rowDim: {
     opacity: 0.6,

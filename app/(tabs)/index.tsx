@@ -49,6 +49,7 @@ import MemoryViewer from "../components/MemoryViewer";
 import {
   BackgroundStickers,
   GinghamBackground,
+  GinghamPatch,
   GridPaper,
   StickerLayer,
 } from "../components/PaperDecor";
@@ -129,29 +130,24 @@ const GRAY = "#E6E4DF"; // selected / active highlight
 // iOS needs a beat between two modals; web/android don't
 const modalDelay = Platform.OS === "ios" ? 350 : 0;
 
-// cream text with a solid dark outline (copies offset in 8 directions)
+const OUTLINE = 2.5; // outline thickness
+const OUTLINE_STEPS = 16; // more steps = smoother
+const OUTLINE_OFFSETS = Array.from({ length: OUTLINE_STEPS }, (_, i) => {
+  const a = (i / OUTLINE_STEPS) * Math.PI * 2;
+  return [Math.cos(a) * OUTLINE, Math.sin(a) * OUTLINE];
+});
+
 function OutlinedTitle({ text }: { text: string }) {
-  const O = 2; // outline thickness
-  const offsets = [
-    [-O, 0],
-    [O, 0],
-    [0, -O],
-    [0, O],
-    [-O, -O],
-    [O, -O],
-    [-O, O],
-    [O, O],
-  ];
   return (
     <View style={styles.titleWrap}>
-      {offsets.map(([dx, dy], i) => (
+      {OUTLINE_OFFSETS.map(([dx, dy], i) => (
         <ThemedText
           key={i}
           numberOfLines={1}
           style={[
             styles.headerTitle,
             styles.titleOutline,
-            { color: PAPER, left: O + dx, top: O + dy },
+            { color: PAPER, left: OUTLINE + dx, top: OUTLINE + dy },
           ]}
         >
           {text}
@@ -159,7 +155,7 @@ function OutlinedTitle({ text }: { text: string }) {
       ))}
       <ThemedText
         numberOfLines={1}
-        style={[styles.headerTitle, { color: "black", margin: O }]}
+        style={[styles.headerTitle, { color: "black", margin: OUTLINE }]}
       >
         {text}
       </ThemedText>
@@ -447,6 +443,40 @@ function FilterDropdown({
   );
 }
 
+// one punched hole: shows the gingham from the screen background
+function Hole({
+  index,
+  rootRef,
+}: {
+  index: number;
+  rootRef: React.RefObject<View | null>;
+}) {
+  const ref = useRef<View>(null);
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+
+  const measure = () => {
+    if (!ref.current || !rootRef.current) return;
+    // position relative to the screen container, which is where the gingham starts
+    ref.current.measureLayout(
+      rootRef.current,
+      (x, y) => setPos({ x, y }),
+      () => {},
+    );
+  };
+
+  return (
+    <View ref={ref} collapsable={false} onLayout={measure} style={styles.hole}>
+      {pos && (
+        <GinghamPatch
+          id={`gingham-hole-${index}`}
+          offsetX={pos.x + 1.5} // + hole border width
+          offsetY={pos.y + 1.5}
+        />
+      )}
+    </View>
+  );
+}
+
 export default function Index() {
   const [goals, setGoals] = useState<BucketItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -458,6 +488,7 @@ export default function Index() {
   const [memoryFilters, setMemoryFilters] = useState<Filters>(NO_FILTERS);
   // real height of the memories page content, so stickers can follow it
   const [memoriesHeight, setMemoriesHeight] = useState(0);
+  const rootRef = useRef<View>(null);
 
   const [dreamModal, setDreamModal] = useState<{
     open: boolean;
@@ -670,11 +701,9 @@ export default function Index() {
     );
 
   return (
-    <View style={styles.container}>
-      {/* app background: gingham + stickers, drawn first so the paper covers it */}
+    <View ref={rootRef} collapsable={false} style={styles.container}>
       <GinghamBackground />
       <BackgroundStickers />
-
       <StatusBar
         barStyle="dark-content"
         backgroundColor={theme.colors.background}
@@ -688,8 +717,8 @@ export default function Index() {
           <WobblyCircle
             size={46}
             fill={PAPER}
-            stroke={theme.colors.border}
-            strokeWidth={3}
+            stroke="transparent"
+            strokeWidth={0}
             seed={3}
           >
             <Menu size={22} color={theme.colors.textPrimary} />
@@ -698,7 +727,6 @@ export default function Index() {
 
         <OutlinedTitle text="Map Bucketlist" />
       </View>
-
       <View style={styles.notebook}>
         {/* Folder tabs sticking out of the page */}
         <View style={styles.tabRow}>
@@ -763,7 +791,7 @@ export default function Index() {
             )}
             <View style={styles.holes} pointerEvents="none">
               {Array.from({ length: HOLES }).map((_, i) => (
-                <View key={i} style={styles.hole} />
+                <Hole key={i} index={i} rootRef={rootRef} />
               ))}
             </View>
 
@@ -885,14 +913,12 @@ export default function Index() {
           </View>
         </WobblyBox>
       </View>
-
       <TouchableOpacity
         style={styles.floatingButton}
         onPress={() => setDreamModal({ open: true, goal: null })}
       >
         <Plus size={30} color="white" />
       </TouchableOpacity>
-
       <DreamModal
         visible={dreamModal.open}
         goal={dreamModal.goal}
@@ -908,14 +934,12 @@ export default function Index() {
           if (goal) setTimeout(() => openComplete(goal), modalDelay);
         }}
       />
-
       <MemoryViewer
         visible={!!viewerGoal}
         goal={viewerGoal}
         onClose={() => setViewerId(null)}
         onEdit={editFromViewer}
       />
-
       <MemoryModal
         visible={memoryModal.open}
         mode={memoryModal.mode}
@@ -929,7 +953,6 @@ export default function Index() {
           setMemoryModal((m) => ({ ...m, open: false }));
         }}
       />
-
       <SideMenu
         visible={menuOpen}
         items={MENU_ITEMS}
@@ -1061,7 +1084,8 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: theme.colors.background,
+    overflow: "hidden",
+    backgroundColor: "#9AA07E", // same as GINGHAM_BASE
     borderWidth: 1.5,
     borderColor: "#D9CDB4",
   },

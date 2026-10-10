@@ -8,6 +8,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import Svg, { Defs, Path, Pattern, Rect } from "react-native-svg";
+import { BG_STICKERS } from "../../config/bgStickers";
 import { GRID_LINE } from "../../config/paper";
 import { STICKERS } from "../../config/stickers";
 
@@ -196,7 +197,7 @@ export function GinghamBackground() {
 // sampling: try several random spots and keep the one farthest from the
 // stickers already placed. Still random-looking, but evenly spread.
 export function BackgroundStickers({
-  count = 32,
+  count = 60,
   headerCount = 7,
   headerHeight = 170,
 }: {
@@ -240,7 +241,7 @@ export function BackgroundStickers({
 
       return {
         key: i,
-        source: STICKERS[Math.floor(rand(n + 1) * STICKERS.length)],
+        source: BG_STICKERS[Math.floor(rand(n + 1) * BG_STICKERS.length)],
         size,
         top: best.top,
         left: best.left,
@@ -268,6 +269,56 @@ export function BackgroundStickers({
           />
         </View>
       ))}
+    </View>
+  );
+}
+
+// a piece of the gingham, shifted so it lines up with the full-screen one.
+// offsetX/offsetY = where this patch sits on screen. id must be unique
+// (web shares svg ids across the whole page).
+export function GinghamPatch({
+  id,
+  offsetX,
+  offsetY,
+}: {
+  id: string;
+  offsetX: number;
+  offsetY: number;
+}) {
+  const half = GINGHAM_TILE / 2;
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Svg width="100%" height="100%">
+        <Defs>
+          <Pattern
+            id={id}
+            x={-offsetX}
+            y={-offsetY}
+            width={GINGHAM_TILE}
+            height={GINGHAM_TILE}
+            patternUnits="userSpaceOnUse"
+          >
+            <Rect
+              width={GINGHAM_TILE}
+              height={GINGHAM_TILE}
+              fill={GINGHAM_BASE}
+            />
+            <Rect
+              width={half}
+              height={GINGHAM_TILE}
+              fill={GINGHAM_STRIPE}
+              fillOpacity={GINGHAM_OPACITY}
+            />
+            <Rect
+              width={GINGHAM_TILE}
+              height={half}
+              fill={GINGHAM_STRIPE}
+              fillOpacity={GINGHAM_OPACITY}
+            />
+          </Pattern>
+        </Defs>
+        <Rect width="100%" height="100%" fill={`url(#${id})`} />
+      </Svg>
     </View>
   );
 }

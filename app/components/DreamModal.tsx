@@ -10,9 +10,10 @@ import {
 } from "@sketchyicons/react-native";
 import React, { useEffect, useState } from "react";
 import {
+  Animated,
+  BackHandler,
   Image,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   ScrollView,
   StyleProp,
@@ -28,6 +29,7 @@ import { RULE_LINE } from "../../config/paper";
 import { theme } from "../../config/theme";
 import { BucketItem, NewBucketItem } from "../../lib/supabase";
 import ConfirmDialog from "./ConfirmDialog";
+import { useModalAnimation } from "./ui/useModalAnimation";
 import WobblyBox, { WobblyCircle, WobblyLine } from "./ui/WobblyBox";
 
 type Period = "soon" | "someday";
@@ -106,6 +108,7 @@ export default function DreamModal({
   const [period, setPeriod] = useState<Period>("soon");
   const [confirming, setConfirming] = useState(false);
   const insets = useSafeAreaInsets();
+  const { mounted, backdropStyle, slideStyle } = useModalAnimation(visible);
 
   const editing = !!goal;
 
@@ -122,6 +125,17 @@ export default function DreamModal({
     );
   }, [visible, goal?.id]);
 
+  // Android back button: close the confirm first, then the sheet
+  useEffect(() => {
+    if (!visible) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (confirming) setConfirming(false);
+      else onClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [visible, confirming, onClose]);
+
   const handleSave = () => {
     if (!title.trim()) return;
     onSave({ title: title.trim(), category, added_by: addedBy, period });
@@ -130,19 +144,22 @@ export default function DreamModal({
 
   const HeadingIcon = editing ? Pencil : Sparkles;
 
+  if (!mounted) return null;
+
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-      statusBarTranslucent // add if missing
-      navigationBarTranslucent // add if missing
+    <KeyboardAvoidingView
+      style={styles.overlay}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      pointerEvents={visible ? "auto" : "none"}
     >
-      <KeyboardAvoidingView
-        style={styles.overlay}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+      {/* dim background */}
+      <Animated.View
+        style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]}
+        pointerEvents="none"
+      />
+
+      {/* the sheet slides up */}
+      <Animated.View style={[styles.sheetWrap, slideStyle]}>
         <WobblyBox
           style={[styles.sheet, { paddingBottom: 26 + insets.bottom }]}
           fill="#FFFBEF"
@@ -345,34 +362,42 @@ export default function DreamModal({
             )}
           </View>
         </WobblyBox>
+      </Animated.View>
 
-        <ConfirmDialog
-          visible={confirming}
-          title="Tear this dream out?"
-          message="It'll be gone from the notebook."
-          onCancel={() => setConfirming(false)}
-          onConfirm={() => {
-            setConfirming(false);
-            onDelete?.();
-          }}
-        />
-      </KeyboardAvoidingView>
-    </Modal>
+      <ConfirmDialog
+        visible={confirming}
+        title="Tear this dream out?"
+        message="It'll be gone from the notebook."
+        onCancel={() => setConfirming(false)}
+        onConfirm={() => {
+          setConfirming(false);
+          onDelete?.();
+        }}
+      />
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 999,
+    elevation: 999,
     justifyContent: "flex-end",
   },
+  backdrop: {
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  // animated wrapper: owns the max height and the hidden-edge margin
+  sheetWrap: {
+    maxHeight: "92%",
+    marginBottom: -6, // hides the wobbly bottom edge just below the screen
+  },
   sheet: {
+    flexShrink: 1,
     paddingHorizontal: theme.spacing.md,
     paddingTop: theme.spacing.md,
     paddingBottom: 26,
-    marginBottom: -6, // hides the wobbly bottom edge just below the screen
-    maxHeight: "92%",
   },
   headerRow: {
     flexDirection: "row",

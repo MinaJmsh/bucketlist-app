@@ -9,9 +9,10 @@ import {
   Zap,
 } from "@sketchyicons/react-native";
 import { Image } from "expo-image";
-import React, { useState } from "react";
+import React, { useEffect, useRef } from "react";
 import {
-  Modal,
+  Animated,
+  BackHandler,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -23,14 +24,15 @@ import { getRating } from "../../config/ratings";
 import { theme } from "../../config/theme";
 import { pickTape } from "../../config/washi";
 import { BucketItem } from "../../lib/supabase";
-import CameraViewer from "./CameraViewer";
 import { CornerSticker, GridPaper } from "./PaperDecor";
+import { useModalAnimation } from "./ui/useModalAnimation";
 import WobblyBox, { WobblyCircle, WobblyLine, hashSeed } from "./ui/WobblyBox";
 
 const TILTS = [-4, 3, -2, 4, -3, 2];
 
 const formatDate = (dateString: string | null) => {
   if (!dateString) return "";
+
   return new Date(dateString).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -41,9 +43,10 @@ const formatDate = (dateString: string | null) => {
 const daysBetween = (a: string, b: string) =>
   Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000);
 
-// one washi tape piece, random but stable for a given key
+// One washi tape piece, stable for a given key.
 function Tape({ tapeKey, style }: { tapeKey: string; style: object }) {
   const tape = pickTape(tapeKey);
+
   return (
     <Image
       source={tape.source}
@@ -53,7 +56,7 @@ function Tape({ tapeKey, style }: { tapeKey: string; style: object }) {
   );
 }
 
-// date / rating tags: plain highlighter-style pills
+// Date / rating tags.
 function Tag({
   color,
   tilt,
@@ -67,7 +70,10 @@ function Tag({
     <View
       style={[
         styles.tag,
-        { backgroundColor: color, transform: [{ rotate: `${tilt}deg` }] },
+        {
+          backgroundColor: color,
+          transform: [{ rotate: `${tilt}deg` }],
+        },
       ]}
     >
       {children}
@@ -84,51 +90,61 @@ interface MemoryViewerProps {
 
 export default function MemoryViewer({
   visible,
-  goal,
+  goal: goalProp,
   onClose,
   onEdit,
 }: MemoryViewerProps) {
-  // which photo is open in the camera view (null = camera closed)
-  const [cameraIndex, setCameraIndex] = useState<number | null>(null);
+  const { mounted, backdropStyle, popStyle } = useModalAnimation(visible);
 
-  if (!goal) return null;
+  // The parent sets goal to null the moment it closes. Keep the last one so
+  // the page doesn't go blank while the closing animation is still playing.
+  const lastGoal = useRef<BucketItem | null>(null);
+  if (goalProp) lastGoal.current = goalProp;
+  const goal = goalProp ?? lastGoal.current;
+
+  // Handle Android's hardware back button without a native Modal.
+  useEffect(() => {
+    if (!visible || !goalProp) return;
+
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        onClose();
+        return true;
+      },
+    );
+
+    return () => subscription.remove();
+  }, [visible, goalProp, onClose]);
+
+  if (!mounted || !goal) return null;
 
   const photos = goal.photos ?? [];
   const color = getCategoryColor(goal.category);
   const CategoryIcon = getCategoryIcon(goal.category);
+
   const days =
     goal.completed_at && goal.created_at
       ? daysBetween(goal.created_at, goal.completed_at)
       : 0;
+
   const writer =
     goal.added_by === "A" ? "mina" : goal.added_by === "B" ? "parsa" : "";
+
   const DaysIcon = days >= 1 ? Hourglass : Zap;
   const rating = getRating(goal.rating);
   const seed = hashSeed(goal.id);
 
-  const handleClose = () => {
-    setCameraIndex(null);
-    onClose();
-  };
-
-  const handleEdit = () => {
-    setCameraIndex(null);
-    onEdit();
-  };
-
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      // Android back button: close the camera first, then the page
-      onRequestClose={() =>
-        cameraIndex !== null ? setCameraIndex(null) : handleClose()
-      }
-      statusBarTranslucent
-      navigationBarTranslucent
-    >
-      <View style={styles.overlay}>
+    <View style={styles.overlay} pointerEvents={visible ? "auto" : "none"}>
+      {/* dim background */}
+      <Animated.View
+        style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]}
+        pointerEvents="none"
+      />
+
+      {/* the page pops in */}
+      <Animated.View style={[styles.cardWrap, popStyle]}>
         <WobblyBox
           style={styles.card}
           fill={PAPER}
@@ -138,7 +154,7 @@ export default function MemoryViewer({
         >
           <TouchableOpacity
             style={styles.closeButton}
-            onPress={handleClose}
+            onPress={onClose}
             accessibilityLabel="Close"
           >
             <WobblyCircle
@@ -151,9 +167,10 @@ export default function MemoryViewer({
             </WobblyCircle>
           </TouchableOpacity>
 
-          {/* everything that scrolls is clipped INSIDE the wobbly outline */}
+          {/* Scrollable content stays inside the wobbly outline. */}
           <View style={styles.clip}>
             <GridPaper />
+
             <ScrollView
               style={styles.scroll}
               contentContainerStyle={styles.content}
@@ -163,7 +180,7 @@ export default function MemoryViewer({
 
               <ThemedText style={styles.title}>{goal.title}</ThemedText>
 
-              {/* date tags */}
+              {/* Date tags */}
               <View style={styles.tagRow}>
                 <Tag color={theme.colors.accent + "55"} tilt={-2}>
                   <Sprout size={14} color={theme.colors.textPrimary} />
@@ -171,12 +188,14 @@ export default function MemoryViewer({
                     dreamed up {formatDate(goal.created_at)}
                   </ThemedText>
                 </Tag>
+
                 <Tag color={theme.colors.secondary + "55"} tilt={2}>
                   <PartyPopper size={14} color={theme.colors.textPrimary} />
                   <ThemedText style={styles.tagText}>
                     done {formatDate(goal.completed_at)}
                   </ThemedText>
                 </Tag>
+
                 <Tag color={theme.colors.primary + "33"} tilt={-1}>
                   <DaysIcon size={14} color={theme.colors.textPrimary} />
                   <ThemedText style={styles.tagText}>
@@ -185,6 +204,7 @@ export default function MemoryViewer({
                       : "done the same day!"}
                   </ThemedText>
                 </Tag>
+
                 {rating && (
                   <Tag color={rating.color + "33"} tilt={1.5}>
                     <rating.Icon size={14} color={rating.color} />
@@ -195,14 +215,13 @@ export default function MemoryViewer({
                 )}
               </View>
 
-              {/* polaroids: tap one to open it in the camera */}
+              {/* Polaroids stay exactly as scrapbook decorations.
+                  They are Views, not TouchableOpacity, so they cannot be opened. */}
               <View style={styles.polaroidArea}>
                 {photos.length > 0 ? (
                   photos.map((uri, i) => (
-                    <TouchableOpacity
+                    <View
                       key={uri + i}
-                      activeOpacity={0.9}
-                      onPress={() => setCameraIndex(i)}
                       style={[
                         styles.polaroidShadow,
                         photos.length === 1 && styles.polaroidSingle,
@@ -219,6 +238,7 @@ export default function MemoryViewer({
                           { backgroundColor: "white" },
                         ]}
                       />
+
                       <WobblyBox
                         style={styles.polaroid}
                         fill="white"
@@ -230,15 +250,17 @@ export default function MemoryViewer({
                           tapeKey={goal.id + "photo" + i}
                           style={styles.tape}
                         />
+
                         <Image
                           source={{ uri }}
                           style={styles.photo}
                           contentFit="cover"
                         />
+
                         <ThemedText style={styles.photoCaption}>
                           {i === 0 ? goal.title : ""}
                         </ThemedText>
-                        {/* sticker on the photo's top-right corner (no text there) */}
+
                         {i % 2 === 0 && (
                           <CornerSticker
                             stickerKey={goal.id + "ps" + i}
@@ -246,7 +268,7 @@ export default function MemoryViewer({
                           />
                         )}
                       </WobblyBox>
-                    </TouchableOpacity>
+                    </View>
                   ))
                 ) : (
                   <View
@@ -259,6 +281,7 @@ export default function MemoryViewer({
                     <View
                       style={[styles.shadowRect, { backgroundColor: "white" }]}
                     />
+
                     <WobblyBox
                       style={styles.polaroid}
                       fill="white"
@@ -267,6 +290,7 @@ export default function MemoryViewer({
                       seed={seed + 10}
                     >
                       <Tape tapeKey={goal.id + "photo0"} style={styles.tape} />
+
                       <View
                         style={[
                           styles.photo,
@@ -276,9 +300,11 @@ export default function MemoryViewer({
                       >
                         <CategoryIcon size={60} color={color} />
                       </View>
+
                       <ThemedText style={styles.photoCaption}>
                         {goal.title}
                       </ThemedText>
+
                       <CornerSticker
                         stickerKey={goal.id + "ps0"}
                         style={{ top: -10, right: -10 }}
@@ -288,11 +314,12 @@ export default function MemoryViewer({
                 )}
               </View>
 
-              {/* sticky note */}
+              {/* Sticky note */}
               <View style={styles.noteShadow}>
                 <View
                   style={[styles.shadowRect, { backgroundColor: "#FFF6B8" }]}
                 />
+
                 <WobblyBox
                   style={styles.note}
                   fill="#FFF6B8"
@@ -301,9 +328,11 @@ export default function MemoryViewer({
                   seed={seed + 30}
                 >
                   <Tape tapeKey={goal.id + "note"} style={styles.noteTape} />
+
                   <ThemedText style={styles.noteHeading}>
                     our little note
                   </ThemedText>
+
                   {goal.description ? (
                     <ThemedText style={styles.noteText}>
                       {goal.description}
@@ -313,6 +342,7 @@ export default function MemoryViewer({
                       nothing written yet... tap edit to add a note
                     </ThemedText>
                   )}
+
                   {!!writer && (
                     <View style={styles.signRow}>
                       <ThemedText style={styles.noteSign}>
@@ -321,7 +351,7 @@ export default function MemoryViewer({
                       <Heart size={14} color={theme.colors.textSecondary} />
                     </View>
                   )}
-                  {/* bottom-left corner: the signature is right-aligned, so it's free */}
+
                   <CornerSticker
                     stickerKey={goal.id + "ns"}
                     size={48}
@@ -339,7 +369,8 @@ export default function MemoryViewer({
               strokeWidth={2}
               seed={seed + 40}
             />
-            <TouchableOpacity onPress={handleEdit} activeOpacity={0.8}>
+
+            <TouchableOpacity onPress={onEdit} activeOpacity={0.8}>
               <WobblyBox
                 style={styles.editButton}
                 fill={theme.colors.primary}
@@ -353,32 +384,32 @@ export default function MemoryViewer({
             </TouchableOpacity>
           </View>
         </WobblyBox>
-
-        {/* camera view: last child so it sits on top of everything */}
-        <CameraViewer
-          photos={photos}
-          startIndex={cameraIndex}
-          onClose={() => setCameraIndex(null)}
-        />
-      </View>
-    </Modal>
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.55)",
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 999,
+    elevation: 999,
     justifyContent: "center",
     alignItems: "center",
     padding: 18,
   },
-  card: {
+  backdrop: {
+    backgroundColor: "rgba(0,0,0,0.55)",
+  },
+  // animated wrapper: owns the size limits
+  cardWrap: {
     width: "100%",
     maxWidth: 420,
     maxHeight: "90%",
   },
-  // clips the grid + scrolling content to sit inside the wobbly outline
+  card: {
+    flexShrink: 1,
+  },
   clip: {
     flexShrink: 1,
     margin: 7,
@@ -394,11 +425,10 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   content: {
-    paddingHorizontal: 20, // a bit of room so corner stickers aren't clipped
+    paddingHorizontal: 20,
     paddingTop: 40,
     paddingBottom: 30,
   },
-  // washi tape images (rotation is set per tape in <Tape />)
   topTape: {
     position: "absolute",
     top: 8,
@@ -413,7 +443,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: theme.colors.textPrimary,
     marginBottom: 10,
-    paddingHorizontal: 24, // keeps long titles clear of the close button
+    paddingHorizontal: 24,
   },
   tagRow: {
     flexDirection: "row",
@@ -429,21 +459,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 10,
-    flexShrink: 1, // lets the tag shrink to the row width
+    flexShrink: 1,
     maxWidth: "100%",
   },
   tagText: {
     flexShrink: 1,
     fontSize: 14,
     lineHeight: 20,
-    paddingRight: 2, // Android measures text slightly narrow; this stops the last letter being clipped
+    paddingRight: 2,
     color: theme.colors.textPrimary,
   },
   polaroidArea: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "center",
-    alignItems: "flex-start", // don't stretch shorter polaroids
+    alignItems: "flex-start",
     gap: 14,
     marginBottom: 26,
   },
@@ -453,8 +483,6 @@ const styles = StyleSheet.create({
   polaroidSingle: {
     width: "76%",
   },
-  // inset rectangle that only carries the shadow; it sits fully inside the
-  // wobbly outline, so only the soft shadow shows outside the line
   shadowRect: {
     position: "absolute",
     top: 5,
@@ -502,7 +530,7 @@ const styles = StyleSheet.create({
   note: {
     padding: 16,
     paddingTop: 20,
-    paddingBottom: 24, // keeps the bottom-left sticker clear of the text
+    paddingBottom: 24,
   },
   noteTape: {
     position: "absolute",

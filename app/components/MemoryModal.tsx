@@ -12,22 +12,26 @@ import type { ImagePickerAsset } from "expo-image-picker";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  BackHandler,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   ScrollView,
   StyleSheet,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
+import ConfettiCannon from "react-native-confetti-cannon";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { RULE_LINE } from "../../config/paper";
-import { RATINGS, getRating } from "../../config/ratings";
+import { getRating, RATINGS } from "../../config/ratings";
 import { theme } from "../../config/theme";
 import { pickPhotos, uploadPhoto } from "../../lib/photos";
 import { BucketItem } from "../../lib/supabase";
 import ConfirmDialog from "./ConfirmDialog";
+import { useModalAnimation } from "./ui/useModalAnimation";
 import WobblyBox, { WobblyCircle, WobblyLine } from "./ui/WobblyBox";
 
 export interface MemoryValues {
@@ -94,7 +98,11 @@ export default function MemoryModal({
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState("");
   const [rating, setRating] = useState<number | null>(null);
+  // bumps every time the sheet opens, so the confetti replays each time
+  const [burst, setBurst] = useState(0);
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const { mounted, backdropStyle, slideStyle } = useModalAnimation(visible);
 
   useEffect(() => {
     if (!visible) return;
@@ -105,7 +113,19 @@ export default function MemoryModal({
     setSaving(false);
     setConfirming(false);
     setError("");
+    setBurst((b) => b + 1);
   }, [visible, goal?.id]);
+
+  // Android back button: close the confirm first, then the sheet
+  useEffect(() => {
+    if (!visible) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (confirming) setConfirming(false);
+      else if (!saving) onClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [visible, confirming, saving, onClose]);
 
   const addPhotos = async () => {
     const remaining = MAX_PHOTOS - photos.length;
@@ -153,19 +173,22 @@ export default function MemoryModal({
   const isComplete = mode === "complete";
   const HeadingIcon = isComplete ? PartyPopper : Pencil;
 
+  if (!mounted) return null;
+
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-      statusBarTranslucent // add if missing
-      navigationBarTranslucent // add if missing
+    <KeyboardAvoidingView
+      style={styles.overlay}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      pointerEvents={visible ? "auto" : "none"}
     >
-      <KeyboardAvoidingView
-        style={styles.overlay}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+      {/* dim background */}
+      <Animated.View
+        style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]}
+        pointerEvents="none"
+      />
+
+      {/* the sheet slides up */}
+      <Animated.View style={[styles.sheetWrap, slideStyle]}>
         <WobblyBox
           style={[styles.sheet, { paddingBottom: 26 + insets.bottom }]}
           fill="#FFFBEF"
@@ -363,34 +386,65 @@ export default function MemoryModal({
             </TouchableOpacity>
           </View>
         </WobblyBox>
+      </Animated.View>
 
-        <ConfirmDialog
-          visible={confirming}
-          title="Tear this page out?"
-          message="This memory will be gone from the scrapbook for good."
-          onCancel={() => setConfirming(false)}
-          onConfirm={() => {
-            setConfirming(false);
-            onDelete?.();
-          }}
-        />
-      </KeyboardAvoidingView>
-    </Modal>
+      <ConfirmDialog
+        visible={confirming}
+        title="Tear this page out?"
+        message="This memory will be gone from the scrapbook for good."
+        onCancel={() => setConfirming(false)}
+        onConfirm={() => {
+          setConfirming(false);
+          onDelete?.();
+        }}
+      />
+
+      {/* confetti: replays on every open thanks to the key */}
+      {isComplete && visible && (
+        <View style={styles.confetti} pointerEvents="none">
+          <ConfettiCannon
+            key={burst}
+            count={80}
+            origin={{ x: width / 2, y: -10 }}
+            autoStartDelay={250}
+            explosionSpeed={1000}
+            fallSpeed={3000}
+            fadeOut
+            colors={[
+              theme.colors.primary,
+              theme.colors.secondary,
+              theme.colors.accent,
+              "#F7D774",
+              "#F4A6B8",
+              "#9AD1C0",
+            ]}
+          />
+        </View>
+      )}
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 999,
+    elevation: 999,
     justifyContent: "flex-end",
   },
+  backdrop: {
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  // animated wrapper: owns the max height and the hidden-edge margin
+  sheetWrap: {
+    maxHeight: "92%",
+    marginBottom: -6, // hides the wobbly bottom edge just below the screen
+  },
   sheet: {
+    flexShrink: 1,
     paddingHorizontal: theme.spacing.md,
     paddingTop: theme.spacing.md,
     paddingBottom: 26,
-    marginBottom: -6, // hides the wobbly bottom edge just below the screen
-    maxHeight: "92%",
   },
   headerRow: {
     flexDirection: "row",
@@ -564,5 +618,10 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "600",
     fontSize: 15,
+  },
+  confetti: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1000,
+    elevation: 1000,
   },
 });

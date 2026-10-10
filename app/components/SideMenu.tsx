@@ -1,19 +1,24 @@
 import { ThemedText } from "@/components/themed-text";
+import { Heart, Sparkles } from "@sketchyicons/react-native";
+import { Image } from "expo-image";
 import React, { ComponentType, useEffect, useRef, useState } from "react";
 import {
   Animated,
+  BackHandler,
   Dimensions,
   Easing,
-  Modal,
   Platform,
   Pressable,
   StatusBar,
   StyleSheet,
   View,
 } from "react-native";
-import { MARGIN_LINE, PAPER } from "../../config/paper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { MARGIN_LINE, PAPER, RULE_LINE } from "../../config/paper";
 import { theme } from "../../config/theme";
-import WobblyBox from "./ui/WobblyBox";
+import { pickTape } from "../../config/washi";
+import { CornerSticker } from "./PaperDecor";
+import WobblyBox, { WobblyLine } from "./ui/WobblyBox";
 
 export type MenuItem = {
   id: string;
@@ -30,11 +35,10 @@ interface SideMenuProps {
   onSelect: (id: string) => void;
 }
 
-const DRAWER_WIDTH = Math.min(300, Dimensions.get("window").width * 0.8);
+const DRAWER_WIDTH = Math.min(290, Dimensions.get("window").width * 0.78);
 const TOP_INSET =
   Platform.OS === "ios" ? 54 : (StatusBar.currentHeight ?? 24) + 6;
-
-// each row gets a tiny different tilt, like it was written by hand
+const HOLES = 7;
 const TILTS = [-1.2, 0.8, -0.6, 1, -0.9];
 
 export default function SideMenu({
@@ -47,10 +51,19 @@ export default function SideMenu({
   const [mounted, setMounted] = useState(visible);
   const slide = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
   const fade = useRef(new Animated.Value(0)).current;
+  const insets = useSafeAreaInsets();
+
+  const bottomInset = Math.max(
+    insets.bottom,
+    Platform.OS === "android" ? 24 : 0,
+  );
+
+  const tape = pickTape("side-menu");
 
   useEffect(() => {
     if (visible) {
       setMounted(true);
+
       Animated.parallel([
         Animated.timing(slide, {
           toValue: 0,
@@ -81,50 +94,89 @@ export default function SideMenu({
     }
   }, [visible]);
 
+  // Preserve Android hardware-back behavior without a native Modal.
+  useEffect(() => {
+    if (!mounted || !visible || Platform.OS !== "android") {
+      return;
+    }
+
+    const subscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      () => {
+        onClose();
+        return true;
+      },
+    );
+
+    return () => subscription.remove();
+  }, [mounted, visible, onClose]);
+
   if (!mounted) return null;
 
   return (
-    <Modal
-      transparent
-      visible
-      animationType="none"
-      onRequestClose={onClose}
-      statusBarTranslucent // add if missing
-      navigationBarTranslucent // add if missing
-    >
-      <View style={styles.root}>
-        <Animated.View style={[styles.backdrop, { opacity: fade }]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        </Animated.View>
+    <View style={styles.root}>
+      <Animated.View style={[styles.backdrop, { opacity: fade }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+      </Animated.View>
 
-        <Animated.View
-          style={[styles.drawer, { transform: [{ translateX: slide }] }]}
+      <Animated.View
+        style={[
+          styles.drawer,
+          {
+            paddingBottom: 20 + bottomInset,
+            transform: [{ translateX: slide }],
+          },
+        ]}
+      >
+        <WobblyBox
+          style={styles.page}
+          fill={PAPER}
+          stroke={theme.colors.border}
+          strokeWidth={2.5}
+          seed={7}
         >
-          <WobblyBox
-            style={styles.page}
-            fill={PAPER}
-            stroke={theme.colors.border}
-            strokeWidth={2.5}
-            seed={7}
-          >
-            {/* washi tape holding the page up */}
-            <View style={styles.tape} pointerEvents="none" />
-            {/* margin line */}
-            <View style={styles.marginLine} pointerEvents="none" />
+          <View style={styles.holes} pointerEvents="none">
+            {Array.from({ length: HOLES }).map((_, i) => (
+              <View key={i} style={styles.hole} />
+            ))}
+          </View>
 
-            <View style={styles.content}>
+          <View style={styles.marginLine} pointerEvents="none" />
+
+          <Image
+            source={tape.source}
+            contentFit="contain"
+            pointerEvents="none"
+            style={[
+              styles.tape,
+              { transform: [{ rotate: `${tape.rotate}deg` }] },
+            ]}
+          />
+
+          <View style={styles.content}>
+            <View style={styles.titleRow}>
               <ThemedText style={styles.title}>our notebook</ThemedText>
-              <ThemedText style={styles.subtitle}>
-                pick a page to flip to
-              </ThemedText>
+              <Sparkles size={18} color={theme.colors.textSecondary} />
+            </View>
 
-              <View style={styles.list}>
-                {items.map((item, i) => {
-                  const Icon = item.icon;
-                  const active = item.id === activeId;
-                  return (
+            <WobblyLine
+              stroke={theme.colors.border}
+              strokeWidth={2}
+              seed={91}
+            />
+
+            <ThemedText style={styles.subtitle}>
+              pick a page to flip to
+            </ThemedText>
+
+            <View style={styles.list}>
+              {items.map((item, i) => {
+                const Icon = item.icon;
+                const active = item.id === activeId;
+
+                return (
+                  <View key={item.id}>
                     <Pressable
-                      key={item.id}
                       onPress={() => {
                         if (item.comingSoon) return;
                         onSelect(item.id);
@@ -141,33 +193,52 @@ export default function SideMenu({
                         item.comingSoon && styles.rowDim,
                       ]}
                     >
-                      <Icon size={24} color={theme.colors.textPrimary} />
+                      <Icon size={20} color={theme.colors.textPrimary} />
+
                       <ThemedText style={styles.rowLabel}>
                         {item.label}
                       </ThemedText>
+
                       {item.comingSoon && (
-                        <View style={styles.sticker}>
-                          <ThemedText style={styles.stickerText}>
-                            soon!
-                          </ThemedText>
+                        <View style={styles.soon}>
+                          <ThemedText style={styles.soonText}>soon!</ThemedText>
                         </View>
                       )}
                     </Pressable>
-                  );
-                })}
-              </View>
 
-              <ThemedText style={styles.footer}>made with love ♡</ThemedText>
+                    <WobblyLine
+                      stroke={RULE_LINE}
+                      strokeWidth={2}
+                      seed={100 + i}
+                    />
+                  </View>
+                );
+              })}
             </View>
-          </WobblyBox>
-        </Animated.View>
-      </View>
-    </Modal>
+
+            <View style={styles.footerRow}>
+              <ThemedText style={styles.footer}>made with love</ThemedText>
+              <Heart size={14} color={theme.colors.primary} />
+            </View>
+          </View>
+
+          <CornerSticker
+            stickerKey="side-menu-sticker"
+            size={54}
+            style={{ bottom: -6, right: -4 }}
+          />
+        </WobblyBox>
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  root: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 999,
+    elevation: 999,
+  },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(60, 40, 30, 0.35)",
@@ -179,84 +250,120 @@ const styles = StyleSheet.create({
     left: 0,
     width: DRAWER_WIDTH,
     paddingTop: TOP_INSET - 14,
-    paddingBottom: 24,
     paddingRight: 6,
   },
-  page: { flex: 1 },
+  page: {
+    flex: 1,
+  },
   tape: {
     position: "absolute",
-    top: -2,
-    left: DRAWER_WIDTH / 2 - 52,
-    width: 90,
-    height: 24,
-    backgroundColor: "rgba(244, 196, 120, 0.75)",
-    transform: [{ rotate: "-3deg" }],
+    top: -8,
+    alignSelf: "center",
+    width: 100,
+    height: 28,
     zIndex: 3,
+  },
+  holes: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 10,
+    justifyContent: "space-around",
+    paddingVertical: 28,
+  },
+  hole: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: theme.colors.background,
+    borderWidth: 1.5,
+    borderColor: "#D9CDB4",
   },
   marginLine: {
     position: "absolute",
     top: 8,
     bottom: 8,
-    left: 40,
+    left: 36,
     width: 2,
     backgroundColor: MARGIN_LINE,
     opacity: 0.7,
   },
   content: {
     flex: 1,
-    paddingTop: 34,
-    paddingLeft: 56,
-    paddingRight: 18,
-    paddingBottom: 20,
+    paddingTop: 30,
+    paddingLeft: 48,
+    paddingRight: 16,
+    paddingBottom: 16,
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   title: {
     fontFamily: "IndieFlower",
-    fontSize: 30,
+    fontSize: 24,
+    lineHeight: 32,
     color: theme.colors.textPrimary,
   },
   subtitle: {
     fontFamily: "IndieFlower",
-    fontSize: 16,
+    fontSize: 14,
+    lineHeight: 20,
     color: theme.colors.textSecondary,
-    marginBottom: 18,
+    marginTop: 4,
+    marginBottom: 14,
   },
-  list: { gap: 10 },
+  list: {
+    gap: 2,
+  },
   row: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
     borderRadius: 4,
   },
-  // highlighter-pen look
   rowActive: {
     backgroundColor: "rgba(255, 224, 102, 0.55)",
   },
-  rowDim: { opacity: 0.6 },
+  rowDim: {
+    opacity: 0.6,
+  },
   rowLabel: {
     flex: 1,
     fontFamily: "IndieFlower",
-    fontSize: 22,
+    fontSize: 18,
+    lineHeight: 26,
     color: theme.colors.textPrimary,
   },
-  sticker: {
+  soon: {
     backgroundColor: "#FFD6E0",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingHorizontal: 7,
+    paddingVertical: 1,
     borderRadius: 8,
     transform: [{ rotate: "6deg" }],
   },
-  stickerText: {
+  soonText: {
     fontFamily: "IndieFlower",
-    fontSize: 14,
+    fontSize: 12,
+    lineHeight: 17,
+    paddingRight: 1,
     color: theme.colors.textPrimary,
   },
-  footer: {
+  footerRow: {
     marginTop: "auto",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingRight: 40,
+  },
+  footer: {
     fontFamily: "IndieFlower",
-    fontSize: 16,
-    textAlign: "center",
+    fontSize: 14,
+    lineHeight: 20,
     color: theme.colors.textSecondary,
     opacity: 0.8,
   },

@@ -54,8 +54,10 @@ import {
 } from "../components/PaperDecor";
 import Polaroid from "../components/Polaroid";
 import SideMenu, { MenuItem } from "../components/SideMenu";
-import WobblyBox, { WobblyLine } from "../components/ui/WobblyBox";
-
+import WobblyBox, {
+  WobblyCircle,
+  WobblyLine,
+} from "../components/ui/WobblyBox";
 type Bucket = "soon" | "someday";
 type PageTab = "dreams" | "memories";
 type DreamSort = "newest" | "oldest" | "az";
@@ -126,6 +128,44 @@ const GRAY = "#E6E4DF"; // selected / active highlight
 
 // iOS needs a beat between two modals; web/android don't
 const modalDelay = Platform.OS === "ios" ? 350 : 0;
+
+// cream text with a solid dark outline (copies offset in 8 directions)
+function OutlinedTitle({ text }: { text: string }) {
+  const O = 2; // outline thickness
+  const offsets = [
+    [-O, 0],
+    [O, 0],
+    [0, -O],
+    [0, O],
+    [-O, -O],
+    [O, -O],
+    [-O, O],
+    [O, O],
+  ];
+  return (
+    <View style={styles.titleWrap}>
+      {offsets.map(([dx, dy], i) => (
+        <ThemedText
+          key={i}
+          numberOfLines={1}
+          style={[
+            styles.headerTitle,
+            styles.titleOutline,
+            { color: PAPER, left: O + dx, top: O + dy },
+          ]}
+        >
+          {text}
+        </ThemedText>
+      ))}
+      <ThemedText
+        numberOfLines={1}
+        style={[styles.headerTitle, { color: "black", margin: O }]}
+      >
+        {text}
+      </ThemedText>
+    </View>
+  );
+}
 
 // Tab that springs up in size when it becomes active
 function TabButton({
@@ -239,14 +279,16 @@ function MenuButton({
               strokeWidth={2}
               seed={seed + 1}
             >
-              <ScrollView
-                style={{ maxHeight: maxMenuHeight }}
-                contentContainerStyle={styles.menuInner}
-                showsVerticalScrollIndicator={false}
-                bounces={false}
-              >
-                {children(() => setOpen(false))}
-              </ScrollView>
+              <View style={styles.menuClip}>
+                <ScrollView
+                  style={{ maxHeight: maxMenuHeight - 14 }}
+                  contentContainerStyle={styles.menuInner}
+                  showsVerticalScrollIndicator={false}
+                  bounces={false}
+                >
+                  {children(() => setOpen(false))}
+                </ScrollView>
+              </View>
             </WobblyBox>
           </Pressable>
         </Pressable>
@@ -637,12 +679,24 @@ export default function Index() {
         barStyle="dark-content"
         backgroundColor={theme.colors.background}
       />
-
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => setMenuOpen(true)} hitSlop={12}>
-          <Menu size={30} color={theme.colors.textPrimary} />
+        <TouchableOpacity
+          onPress={() => setMenuOpen(true)}
+          hitSlop={10}
+          accessibilityLabel="Open menu"
+        >
+          <WobblyCircle
+            size={46}
+            fill={PAPER}
+            stroke={theme.colors.border}
+            strokeWidth={3}
+            seed={3}
+          >
+            <Menu size={22} color={theme.colors.textPrimary} />
+          </WobblyCircle>
         </TouchableOpacity>
-        <ThemedText style={styles.headerTitle}>MAP BUCKETLIST</ThemedText>
+
+        <OutlinedTitle text="Map Bucketlist" />
       </View>
 
       <View style={styles.notebook}>
@@ -901,20 +955,40 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: theme.colors.textSecondary,
   },
+
   header: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 16,
+    gap: 12,
     paddingHorizontal: 20,
     paddingTop:
-      Platform.OS === "ios" ? 64 : (StatusBar.currentHeight ?? 24) + 16,
-    paddingBottom: 40,
+      Platform.OS === "ios" ? 64 : (StatusBar.currentHeight ?? 24) + 12,
+    paddingBottom: 30,
+  },
+  titleBox: {
+    flexShrink: 1,
+  },
+  titleInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  titleWrap: {
+    flexShrink: 1,
+    paddingRight: 6,
+  },
+  titleOutline: {
+    position: "absolute",
   },
   headerTitle: {
     fontFamily: "IndieFlower",
-    fontSize: 22,
-    color: theme.colors.textPrimary,
+    fontSize: 28,
+    lineHeight: 38,
+    paddingRight: 4, // Android measures this font slightly narrow
   },
+
   notebook: {
     flex: 1,
     marginHorizontal: 14,
@@ -1050,8 +1124,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.12)",
   },
+  menuClip: {
+    margin: 7,
+    overflow: "hidden",
+  },
   menuInner: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
     paddingVertical: 6,
   },
   menuHeading: {

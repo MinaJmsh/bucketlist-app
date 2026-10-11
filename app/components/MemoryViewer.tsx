@@ -4,20 +4,26 @@ import {
   Hourglass,
   PartyPopper,
   Pencil,
+  Save,
   Sprout,
   X,
   Zap,
 } from "@sketchyicons/react-native";
 import { Image } from "expo-image";
-import React, { useEffect, useRef } from "react";
+import * as MediaLibrary from "expo-media-library";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Animated,
   BackHandler,
+  Image as RNImage,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
   View,
 } from "react-native";
+import { captureRef } from "react-native-view-shot";
 import { getCategoryColor, getCategoryIcon } from "../../config/categories";
 import { PAPER } from "../../config/paper";
 import { getRating } from "../../config/ratings";
@@ -44,14 +50,34 @@ const daysBetween = (a: string, b: string) =>
   Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000);
 
 // One washi tape piece, stable for a given key.
-function Tape({ tapeKey, style }: { tapeKey: string; style: object }) {
+// `native` uses react-native's Image, which view-shot can capture reliably.
+function Tape({
+  tapeKey,
+  style,
+  native,
+}: {
+  tapeKey: string;
+  style: object;
+  native?: boolean;
+}) {
   const tape = pickTape(tapeKey);
+  const transform = [{ rotate: `${tape.rotate}deg` }];
+
+  if (native) {
+    return (
+      <RNImage
+        source={tape.source as any}
+        resizeMode="contain"
+        style={[style, { transform }]}
+      />
+    );
+  }
 
   return (
     <Image
       source={tape.source}
       contentFit="contain"
-      style={[style, { transform: [{ rotate: `${tape.rotate}deg` }] }]}
+      style={[style, { transform }]}
     />
   );
 }
@@ -117,6 +143,68 @@ export default function MemoryViewer({
     return () => subscription.remove();
   }, [visible, goalProp, onClose]);
 
+  // ---- Save as image -------------------------------------------------------
+  // The visible page is a ScrollView clipped to the screen, so capturing it
+  // only gives what's on screen. Instead, when saving we render a full-height
+  // copy of the page off-screen (no scrolling, no clipping) and capture that.
+  const shotRef = useRef<View>(null);
+  const loadedPhotos = useRef(0);
+  const [saving, setSaving] = useState(false);
+  const [capturing, setCapturing] = useState(false);
+  const [pageWidth, setPageWidth] = useState(0);
+
+  const waitForPhotos = (count: number) =>
+    new Promise<void>((resolve) => {
+      const start = Date.now();
+      const tick = () => {
+        if (loadedPhotos.current >= count || Date.now() - start > 5000) {
+          resolve();
+        } else {
+          setTimeout(tick, 100);
+        }
+      };
+      tick();
+    });
+
+  const handleSave = async () => {
+    if (saving || !goal) return;
+
+    setSaving(true);
+
+    try {
+      const perm = await MediaLibrary.requestPermissionsAsync(true);
+      if (!perm.granted) {
+        Alert.alert(
+          "Permission needed",
+          "Allow photo access to save this page.",
+        );
+        return;
+      }
+
+      loadedPhotos.current = 0;
+      setCapturing(true);
+
+      // wait for the off-screen copy to mount and its photos to load
+      await waitForPhotos((goal.photos ?? []).length);
+      await new Promise((r) => setTimeout(r, 400));
+
+      const uri = await captureRef(shotRef, {
+        format: "png",
+        quality: 1,
+        result: "tmpfile",
+      });
+
+      await MediaLibrary.saveToLibraryAsync(uri);
+      Alert.alert("Saved", "This page is in your photos.");
+    } catch (e) {
+      Alert.alert("Couldn't save", "Something went wrong saving the image.");
+    } finally {
+      setCapturing(false);
+      setSaving(false);
+    }
+  };
+  // --------------------------------------------------------------------------
+
   if (!mounted || !goal) return null;
 
   const photos = goal.photos ?? [];
@@ -134,6 +222,219 @@ export default function MemoryViewer({
   const DaysIcon = days >= 1 ? Hourglass : Zap;
   const rating = getRating(goal.rating);
   const seed = hashSeed(goal.id);
+
+  // The page content. Used twice: in the visible ScrollView (native = false)
+  // and in the off-screen capture copy (native = true).
+  const renderBody = (native: boolean) => {
+    // Android sorts elevated views above their non-elevated siblings when it
+    // draws into a bitmap, so the elevated shadow rect would cover the photos,
+    // note text and stickers in the saved image. For the saved copy, use a flat
+    // grey rect (no elevation) as the fake shadow instead.
+    const shadow = (bg: string) =>
+      native
+        ? [styles.shadowRect, styles.shadowFlat]
+        : [styles.shadowRect, { backgroundColor: bg }];
+
+    return (
+      <>
+        <Tape
+          tapeKey={goal.id + "top"}
+          style={styles.topTape}
+          native={native}
+        />
+
+        <ThemedText style={styles.title}>{goal.title}</ThemedText>
+
+        {/* Date tags */}
+        <View style={styles.tagRow}>
+          <Tag color={theme.colors.accent + "55"} tilt={-2}>
+            <Sprout size={14} color={theme.colors.textPrimary} />
+            <ThemedText style={styles.tagText}>
+              dreamed up {formatDate(goal.created_at)}
+            </ThemedText>
+          </Tag>
+
+          <Tag color={theme.colors.secondary + "55"} tilt={2}>
+            <PartyPopper size={14} color={theme.colors.textPrimary} />
+            <ThemedText style={styles.tagText}>
+              done {formatDate(goal.completed_at)}
+            </ThemedText>
+          </Tag>
+
+          <Tag color={theme.colors.primary + "33"} tilt={-1}>
+            <DaysIcon size={14} color={theme.colors.textPrimary} />
+            <ThemedText style={styles.tagText}>
+              {days >= 1
+                ? `${days} ${days === 1 ? "day" : "days"} of dreaming`
+                : "done the same day!"}
+            </ThemedText>
+          </Tag>
+
+          {rating && (
+            <Tag color={rating.color + "33"} tilt={1.5}>
+              <rating.Icon size={14} color={rating.color} />
+              <ThemedText style={styles.tagText}>{rating.label}</ThemedText>
+            </Tag>
+          )}
+        </View>
+
+        {/* Polaroids stay exactly as scrapbook decorations.
+          They are Views, not TouchableOpacity, so they cannot be opened. */}
+        <View style={styles.polaroidArea}>
+          {photos.length > 0 ? (
+            photos.map((uri, i) => (
+              <View
+                key={uri + i}
+                style={[
+                  styles.polaroidShadow,
+                  photos.length === 1 && styles.polaroidSingle,
+                  {
+                    transform: [{ rotate: `${TILTS[i % TILTS.length]}deg` }],
+                  },
+                ]}
+              >
+                <View style={shadow("white")} />
+
+                <WobblyBox
+                  style={styles.polaroid}
+                  fill="white"
+                  stroke={theme.colors.border}
+                  strokeWidth={1.5}
+                  seed={seed + 10 + i}
+                >
+                  <Tape
+                    tapeKey={goal.id + "photo" + i}
+                    style={styles.tape}
+                    native={native}
+                  />
+
+                  {native ? (
+                    <RNImage
+                      source={{ uri }}
+                      style={styles.photo}
+                      resizeMode="cover"
+                      onLoad={() => {
+                        loadedPhotos.current += 1;
+                      }}
+                      onError={() => {
+                        loadedPhotos.current += 1;
+                      }}
+                    />
+                  ) : (
+                    <Image
+                      source={{ uri }}
+                      style={styles.photo}
+                      contentFit="cover"
+                    />
+                  )}
+
+                  <ThemedText style={styles.photoCaption}>
+                    {i === 0 ? goal.title : ""}
+                  </ThemedText>
+
+                  {i % 2 === 0 && (
+                    <CornerSticker
+                      stickerKey={goal.id + "ps" + i}
+                      style={{ top: -10, right: -10 }}
+                    />
+                  )}
+                </WobblyBox>
+              </View>
+            ))
+          ) : (
+            <View
+              style={[
+                styles.polaroidShadow,
+                styles.polaroidSingle,
+                { transform: [{ rotate: "-3deg" }] },
+              ]}
+            >
+              <View style={shadow("white")} />
+
+              <WobblyBox
+                style={styles.polaroid}
+                fill="white"
+                stroke={theme.colors.border}
+                strokeWidth={1.5}
+                seed={seed + 10}
+              >
+                <Tape
+                  tapeKey={goal.id + "photo0"}
+                  style={styles.tape}
+                  native={native}
+                />
+
+                <View
+                  style={[
+                    styles.photo,
+                    styles.noPhoto,
+                    { backgroundColor: color + "40" },
+                  ]}
+                >
+                  <CategoryIcon size={60} color={color} />
+                </View>
+
+                <ThemedText style={styles.photoCaption}>
+                  {goal.title}
+                </ThemedText>
+
+                <CornerSticker
+                  stickerKey={goal.id + "ps0"}
+                  style={{ top: -10, right: -10 }}
+                />
+              </WobblyBox>
+            </View>
+          )}
+        </View>
+
+        {/* Sticky note */}
+        <View style={styles.noteShadow}>
+          <View style={shadow("#FFF6B8")} />
+
+          <WobblyBox
+            style={styles.note}
+            fill="#FFF6B8"
+            stroke="#E3D170"
+            strokeWidth={1.5}
+            seed={seed + 30}
+          >
+            <Tape
+              tapeKey={goal.id + "note"}
+              style={styles.noteTape}
+              native={native}
+            />
+
+            <ThemedText style={styles.noteHeading}>our little note</ThemedText>
+
+            {goal.description ? (
+              <ThemedText style={styles.noteText}>
+                {goal.description}
+              </ThemedText>
+            ) : (
+              <ThemedText style={[styles.noteText, styles.noteEmpty]}>
+                nothing written yet... tap edit to add a note
+              </ThemedText>
+            )}
+
+            {!!writer && (
+              <View style={styles.signRow}>
+                <ThemedText style={styles.noteSign}>
+                  — dreamed up by {writer}
+                </ThemedText>
+                <Heart size={14} color={theme.colors.textSecondary} />
+              </View>
+            )}
+
+            <CornerSticker
+              stickerKey={goal.id + "ns"}
+              size={48}
+              style={{ bottom: -14, left: -10 }}
+            />
+          </WobblyBox>
+        </View>
+      </>
+    );
+  };
 
   return (
     <View style={styles.overlay} pointerEvents={visible ? "auto" : "none"}>
@@ -167,8 +468,34 @@ export default function MemoryViewer({
             </WobblyCircle>
           </TouchableOpacity>
 
+          <TouchableOpacity
+            style={styles.saveButton}
+            onPress={handleSave}
+            disabled={saving}
+            accessibilityLabel="Save as image"
+          >
+            <WobblyCircle
+              size={38}
+              fill="white"
+              stroke={theme.colors.border}
+              seed={seed + 2}
+            >
+              {saving ? (
+                <ActivityIndicator
+                  size="small"
+                  color={theme.colors.textPrimary}
+                />
+              ) : (
+                <Save size={18} color={theme.colors.textPrimary} />
+              )}
+            </WobblyCircle>
+          </TouchableOpacity>
+
           {/* Scrollable content stays inside the wobbly outline. */}
-          <View style={styles.clip}>
+          <View
+            style={styles.clip}
+            onLayout={(e) => setPageWidth(e.nativeEvent.layout.width)}
+          >
             <GridPaper />
 
             <ScrollView
@@ -176,189 +503,7 @@ export default function MemoryViewer({
               contentContainerStyle={styles.content}
               showsVerticalScrollIndicator={false}
             >
-              <Tape tapeKey={goal.id + "top"} style={styles.topTape} />
-
-              <ThemedText style={styles.title}>{goal.title}</ThemedText>
-
-              {/* Date tags */}
-              <View style={styles.tagRow}>
-                <Tag color={theme.colors.accent + "55"} tilt={-2}>
-                  <Sprout size={14} color={theme.colors.textPrimary} />
-                  <ThemedText style={styles.tagText}>
-                    dreamed up {formatDate(goal.created_at)}
-                  </ThemedText>
-                </Tag>
-
-                <Tag color={theme.colors.secondary + "55"} tilt={2}>
-                  <PartyPopper size={14} color={theme.colors.textPrimary} />
-                  <ThemedText style={styles.tagText}>
-                    done {formatDate(goal.completed_at)}
-                  </ThemedText>
-                </Tag>
-
-                <Tag color={theme.colors.primary + "33"} tilt={-1}>
-                  <DaysIcon size={14} color={theme.colors.textPrimary} />
-                  <ThemedText style={styles.tagText}>
-                    {days >= 1
-                      ? `${days} ${days === 1 ? "day" : "days"} of dreaming`
-                      : "done the same day!"}
-                  </ThemedText>
-                </Tag>
-
-                {rating && (
-                  <Tag color={rating.color + "33"} tilt={1.5}>
-                    <rating.Icon size={14} color={rating.color} />
-                    <ThemedText style={styles.tagText}>
-                      {rating.label}
-                    </ThemedText>
-                  </Tag>
-                )}
-              </View>
-
-              {/* Polaroids stay exactly as scrapbook decorations.
-                  They are Views, not TouchableOpacity, so they cannot be opened. */}
-              <View style={styles.polaroidArea}>
-                {photos.length > 0 ? (
-                  photos.map((uri, i) => (
-                    <View
-                      key={uri + i}
-                      style={[
-                        styles.polaroidShadow,
-                        photos.length === 1 && styles.polaroidSingle,
-                        {
-                          transform: [
-                            { rotate: `${TILTS[i % TILTS.length]}deg` },
-                          ],
-                        },
-                      ]}
-                    >
-                      <View
-                        style={[
-                          styles.shadowRect,
-                          { backgroundColor: "white" },
-                        ]}
-                      />
-
-                      <WobblyBox
-                        style={styles.polaroid}
-                        fill="white"
-                        stroke={theme.colors.border}
-                        strokeWidth={1.5}
-                        seed={seed + 10 + i}
-                      >
-                        <Tape
-                          tapeKey={goal.id + "photo" + i}
-                          style={styles.tape}
-                        />
-
-                        <Image
-                          source={{ uri }}
-                          style={styles.photo}
-                          contentFit="cover"
-                        />
-
-                        <ThemedText style={styles.photoCaption}>
-                          {i === 0 ? goal.title : ""}
-                        </ThemedText>
-
-                        {i % 2 === 0 && (
-                          <CornerSticker
-                            stickerKey={goal.id + "ps" + i}
-                            style={{ top: -10, right: -10 }}
-                          />
-                        )}
-                      </WobblyBox>
-                    </View>
-                  ))
-                ) : (
-                  <View
-                    style={[
-                      styles.polaroidShadow,
-                      styles.polaroidSingle,
-                      { transform: [{ rotate: "-3deg" }] },
-                    ]}
-                  >
-                    <View
-                      style={[styles.shadowRect, { backgroundColor: "white" }]}
-                    />
-
-                    <WobblyBox
-                      style={styles.polaroid}
-                      fill="white"
-                      stroke={theme.colors.border}
-                      strokeWidth={1.5}
-                      seed={seed + 10}
-                    >
-                      <Tape tapeKey={goal.id + "photo0"} style={styles.tape} />
-
-                      <View
-                        style={[
-                          styles.photo,
-                          styles.noPhoto,
-                          { backgroundColor: color + "40" },
-                        ]}
-                      >
-                        <CategoryIcon size={60} color={color} />
-                      </View>
-
-                      <ThemedText style={styles.photoCaption}>
-                        {goal.title}
-                      </ThemedText>
-
-                      <CornerSticker
-                        stickerKey={goal.id + "ps0"}
-                        style={{ top: -10, right: -10 }}
-                      />
-                    </WobblyBox>
-                  </View>
-                )}
-              </View>
-
-              {/* Sticky note */}
-              <View style={styles.noteShadow}>
-                <View
-                  style={[styles.shadowRect, { backgroundColor: "#FFF6B8" }]}
-                />
-
-                <WobblyBox
-                  style={styles.note}
-                  fill="#FFF6B8"
-                  stroke="#E3D170"
-                  strokeWidth={1.5}
-                  seed={seed + 30}
-                >
-                  <Tape tapeKey={goal.id + "note"} style={styles.noteTape} />
-
-                  <ThemedText style={styles.noteHeading}>
-                    our little note
-                  </ThemedText>
-
-                  {goal.description ? (
-                    <ThemedText style={styles.noteText}>
-                      {goal.description}
-                    </ThemedText>
-                  ) : (
-                    <ThemedText style={[styles.noteText, styles.noteEmpty]}>
-                      nothing written yet... tap edit to add a note
-                    </ThemedText>
-                  )}
-
-                  {!!writer && (
-                    <View style={styles.signRow}>
-                      <ThemedText style={styles.noteSign}>
-                        — dreamed up by {writer}
-                      </ThemedText>
-                      <Heart size={14} color={theme.colors.textSecondary} />
-                    </View>
-                  )}
-
-                  <CornerSticker
-                    stickerKey={goal.id + "ns"}
-                    size={48}
-                    style={{ bottom: -14, left: -10 }}
-                  />
-                </WobblyBox>
-              </View>
+              {renderBody(false)}
             </ScrollView>
           </View>
 
@@ -385,6 +530,19 @@ export default function MemoryViewer({
           </View>
         </WobblyBox>
       </Animated.View>
+
+      {/* Full-height copy of the page, rendered off-screen only while saving. */}
+      {capturing && (
+        <View
+          ref={shotRef}
+          collapsable={false}
+          pointerEvents="none"
+          style={[styles.captureRoot, { width: pageWidth || 340 }]}
+        >
+          <GridPaper />
+          <View style={styles.content}>{renderBody(true)}</View>
+        </View>
+      )}
     </View>
   );
 }
@@ -420,6 +578,20 @@ const styles = StyleSheet.create({
     top: 14,
     right: 14,
     zIndex: 5,
+  },
+  saveButton: {
+    position: "absolute",
+    top: 14,
+    right: 60, // 14 (close offset) + 38 (circle) + 8 gap
+    zIndex: 5,
+  },
+  // off-screen, natural height, solid paper background
+  captureRoot: {
+    position: "absolute",
+    top: 0,
+    left: -5000,
+    backgroundColor: PAPER,
+    overflow: "hidden",
   },
   scroll: {
     flexShrink: 1,
@@ -494,6 +666,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.14,
     shadowRadius: 8,
     elevation: 4,
+  },
+  shadowFlat: {
+    top: 7,
+    left: 7,
+    right: 3,
+    bottom: 3,
+    elevation: 0,
+    shadowOpacity: 0,
+    backgroundColor: "rgba(0,0,0,0.12)",
   },
   polaroid: {
     padding: 9,

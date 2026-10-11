@@ -1,5 +1,5 @@
 import { ThemedText } from "@/components/themed-text";
-import { Scissors } from "@sketchyicons/react-native";
+import { Trash2 } from "@sketchyicons/react-native";
 import { Image } from "expo-image";
 import React from "react";
 import { Animated, StyleSheet, TouchableOpacity, View } from "react-native";
@@ -24,7 +24,7 @@ export default function ConfirmDialog({
   visible,
   title,
   message,
-  confirmLabel = "Tear out",
+  confirmLabel = "Remove",
   cancelLabel = "Keep it",
   onConfirm,
   onCancel,
@@ -62,7 +62,7 @@ export default function ConfirmDialog({
             ]}
             pointerEvents="none"
           />
-          <Scissors
+          <Trash2
             size={28}
             color={theme.colors.textPrimary}
             style={{ marginBottom: 4 }}

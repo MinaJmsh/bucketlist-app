@@ -39,6 +39,14 @@
           }
         }
       ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow access to save your memories.",
+          "savePhotosPermission": "Allow saving memories to your photos.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
       "expo-font"
     ],
     "experiments": {

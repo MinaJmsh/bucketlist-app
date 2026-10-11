@@ -118,7 +118,7 @@ const bucketOf = (g: BucketItem): Bucket =>
   g.period === "year" || g.period === "someday" ? "someday" : "soon";
 
 const MENU_ITEMS: MenuItem[] = [
-  { id: "dreams", label: "Our dreams", icon: BookOpen },
+  { id: "dreams", label: "Our bucketlist", icon: BookOpen },
   { id: "games", label: "Games", icon: Dices, comingSoon: true },
   { id: "ideas", label: "Idea box", icon: Lightbulb, comingSoon: true },
 ];
@@ -748,7 +748,7 @@ export default function Index() {
                 pageTab === "dreams" && styles.tabTextActive,
               ]}
             >
-              Dreams {allActive.length}
+              Plans {allActive.length}
             </ThemedText>
           </TabButton>
 
@@ -803,7 +803,8 @@ export default function Index() {
                 {allActive.length === 0 && (
                   <View style={styles.emptyState}>
                     <ThemedText style={styles.emptyText}>
-                      nothing written yet...{"\n"}tap + to add our first dream
+                      nothing written yet...{"\n"}tap + to add our first
+                      bucketlist item{" "}
                     </ThemedText>
                     <Pencil
                       size={28}
@@ -831,7 +832,7 @@ export default function Index() {
                 {allActive.length > 0 && activeGoals.length === 0 && (
                   <View style={styles.noMatch}>
                     <ThemedText style={styles.emptyText}>
-                      no dreams match these filters...
+                      no items match these filters...{" "}
                     </ThemedText>
                   </View>
                 )}

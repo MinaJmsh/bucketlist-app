@@ -4,8 +4,8 @@ import {
   Moon,
   PartyPopper,
   Pencil,
-  Scissors,
   Sparkles,
+  Trash2,
   X,
 } from "@sketchyicons/react-native";
 import React, { useEffect, useState } from "react";
@@ -172,14 +172,14 @@ export default function DreamModal({
             <View style={styles.headingBox}>
               <HeadingIcon size={20} color={theme.colors.textPrimary} />
               <ThemedText style={styles.heading}>
-                {editing ? "Edit this dream" : "Write a new dream"}
+                {editing ? "Edit this plan" : "Make a new plan"}
               </ThemedText>
             </View>
             <View style={styles.headerActions}>
               {editing && (
                 <TouchableOpacity
                   onPress={() => setConfirming(true)}
-                  accessibilityLabel="Tear out this dream"
+                  accessibilityLabel="Remove this plan"
                 >
                   <WobblyCircle
                     size={32}
@@ -187,7 +187,7 @@ export default function DreamModal({
                     stroke={theme.colors.border}
                     seed={11}
                   >
-                    <Scissors size={15} color={theme.colors.textPrimary} />
+                    <Trash2 size={15} color={theme.colors.textPrimary} />
                   </WobblyCircle>
                 </TouchableOpacity>
               )}
@@ -214,7 +214,7 @@ export default function DreamModal({
               <TextInput
                 value={title}
                 onChangeText={setTitle}
-                placeholder="What do you dream of?"
+                placeholder="What should we do?"
                 placeholderTextColor={theme.colors.textSecondary}
                 style={styles.input}
                 autoFocus={!editing}
@@ -366,7 +366,7 @@ export default function DreamModal({
 
       <ConfirmDialog
         visible={confirming}
-        title="Tear this dream out?"
+        title="Remove this plan?"
         message="It'll be gone from the notebook."
         onCancel={() => setConfirming(false)}
         onConfirm={() => {

@@ -4,7 +4,7 @@ import {
   PartyPopper,
   Pencil,
   Pin,
-  Scissors,
+  Trash2,
   X,
 } from "@sketchyicons/react-native";
 import { Image } from "expo-image";
@@ -223,7 +223,7 @@ export default function MemoryModal({
                     stroke={theme.colors.border}
                     seed={13}
                   >
-                    <Scissors size={15} color={theme.colors.textPrimary} />
+                    <Trash2 size={15} color={theme.colors.textPrimary} />
                   </WobblyCircle>
                 </TouchableOpacity>
               )}

@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@expo-google-fonts/indie-flower": "^0.4.1",
+    "@expo-google-fonts/playpen-sans-arabic": "^0.4.1",
     "@expo/vector-icons": "^14.1.0",
     "@react-navigation/bottom-tabs": "^7.3.10",
     "@react-navigation/elements": "^2.3.8",

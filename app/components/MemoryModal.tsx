@@ -1,4 +1,5 @@
 import { ThemedText } from "@/components/themed-text";
+import { ThemedTextInput } from "@/components/themed-text-input";
 import {
   Camera,
   PartyPopper,
@@ -18,7 +19,6 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   useWindowDimensions,
   View,
@@ -251,7 +251,7 @@ export default function MemoryModal({
             style={styles.formScroll}
           >
             <Section label="Title" seed={21}>
-              <TextInput
+              <ThemedTextInput
                 value={title}
                 onChangeText={setTitle}
                 placeholder="What did we do?"
@@ -262,7 +262,7 @@ export default function MemoryModal({
             </Section>
 
             <Section label="Our little note" seed={22}>
-              <TextInput
+              <ThemedTextInput
                 value={description}
                 onChangeText={setDescription}
                 placeholder="How was it? What do we want to remember?"

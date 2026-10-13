@@ -1,5 +1,9 @@
 import { IndieFlower_400Regular } from "@expo-google-fonts/indie-flower";
 import {
+  PlaypenSansArabic_300Light,
+  PlaypenSansArabic_600SemiBold,
+} from "@expo-google-fonts/playpen-sans-arabic";
+import {
   DarkTheme,
   DefaultTheme,
   ThemeProvider,
@@ -25,6 +29,8 @@ export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     IndieFlower_400Regular,
     IndieFlower: IndieFlower_400Regular,
+    PlaypenSansArabic_300Light,
+    PlaypenSansArabic_600SemiBold,
   });
 
   useEffect(() => {

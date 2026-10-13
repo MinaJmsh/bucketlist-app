@@ -1,4 +1,5 @@
 import { ThemedText } from "@/components/themed-text";
+import { ThemedTextInput } from "@/components/themed-text-input";
 import {
   Flower2,
   Moon,
@@ -18,7 +19,6 @@ import {
   ScrollView,
   StyleProp,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   View,
   ViewStyle,
@@ -211,7 +211,7 @@ export default function DreamModal({
             style={styles.formScroll}
           >
             <View style={styles.field}>
-              <TextInput
+              <ThemedTextInput
                 value={title}
                 onChangeText={setTitle}
                 placeholder="What should we do?"
